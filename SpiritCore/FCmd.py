@@ -1,9 +1,11 @@
-import string,sys
+import string
+import sys
 
 __all__ = ["Cmd"]
 
 PROMPT = '(Cmd) '
 IDENTCHARS = string.ascii_letters + string.digits + '_'
+
 
 class Cmd:
     """A simple framework for writing line-oriented command interpreters.
@@ -65,14 +67,14 @@ class Cmd:
                 import readline
                 self.old_completer = readline.get_completer()
                 readline.set_completer(self.complete)
-                readline.parse_and_bind(self.completekey+": complete")
+                readline.parse_and_bind(self.completekey + ": complete")
             except ImportError:
                 pass
         try:
             if intro is not None:
                 self.intro = intro
             if self.intro:
-                self.stdout.write(str(self.intro)+"\n")
+                self.stdout.write(str(self.intro) + "\n")
             stop = None
             while not stop:
                 if self.cmdqueue:
@@ -80,7 +82,7 @@ class Cmd:
                 else:
                     if self.use_rawinput:
                         try:
-                            if sys.version_info.major==2:
+                            if sys.version_info.major == 2:
                                 line = raw_input(self.prompt)
                             else:
                                 self.stdout.write(self.prompt)
@@ -111,7 +113,6 @@ class Cmd:
                     readline.set_completer(self.old_completer)
                 except ImportError:
                     pass
-
 
     def precmd(self, line):
         """Hook method executed just before the command line is
@@ -151,12 +152,13 @@ class Cmd:
             else:
                 return None, None, line
         i, n = 0, len(line)
-        while i < n and line[i] in self.identchars: i = i+1
+        while i < n and line[i] in self.identchars:
+            i = i + 1
         cmd, arg = line[:i], line[i:].strip()
         return cmd, arg, line
 
     def onecmd(self, line):
-        #print(line)
+        # print(line)
         """Interpret the argument as though it had been typed in response
         to the prompt.
 
@@ -172,7 +174,7 @@ class Cmd:
         if cmd is None:
             return self.default(line)
         self.lastcmd = line
-        if line == 'EOF' :
+        if line == 'EOF':
             self.lastcmd = ''
         if cmd == '':
             return self.default(line)
@@ -200,7 +202,7 @@ class Cmd:
         returns.
 
         """
-        self.stdout.write('*** Unknown syntax: %s\n'%line)
+        self.stdout.write('*** Unknown syntax: %s\n' % line)
 
     def completedefault(self, *ignored):
         """Method called to complete an input line when no command-specific
@@ -212,7 +214,7 @@ class Cmd:
         return []
 
     def completenames(self, text, *ignored):
-        dotext = 'do_'+text
+        dotext = 'do_' + text
         return [a[3:] for a in self.get_names() if a.startswith(dotext)]
 
     def complete(self, text, state):
@@ -228,7 +230,7 @@ class Cmd:
             stripped = len(origline) - len(line)
             begidx = readline.get_begidx() - stripped
             endidx = readline.get_endidx() - stripped
-            if begidx>0:
+            if begidx > 0:
                 cmd, args, foo = self.parseline(line)
                 if cmd == '':
                     compfunc = self.completedefault
@@ -250,14 +252,12 @@ class Cmd:
         # at a time dir() didn't do it yet.
         return dir(self.__class__)
 
-
-
     def print_topics(self, header, cmds, cmdlen, maxcol):
         if cmds:
-            self.stdout.write("%s\n"%str(header))
+            self.stdout.write("%s\n" % str(header))
             if self.ruler:
-                self.stdout.write("%s\n"%str(self.ruler * len(header)))
-            self.columnize(cmds, maxcol-1)
+                self.stdout.write("%s\n" % str(self.ruler * len(header)))
+            self.columnize(cmds, maxcol - 1)
             self.stdout.write("\n")
 
     def columnize(self, list, displaywidth=80):
@@ -270,22 +270,23 @@ class Cmd:
             self.stdout.write("<empty>\n")
             return
         nonstrings = [i for i in range(len(list))
-                        if not isinstance(list[i], str)]
+                      if not isinstance(list[i], str)]
         if nonstrings:
-            raise TypeError("list[i] not a string for i in %s" % ", ".join(map(str, nonstrings)))
+            raise TypeError("list[i] not a string for i in %s" %
+                            ", ".join(map(str, nonstrings)))
         size = len(list)
         if size == 1:
-            self.stdout.write('%s\n'%str(list[0]))
+            self.stdout.write('%s\n' % str(list[0]))
             return
         # Try every row count from 1 upwards
         for nrows in range(1, len(list)):
-            ncols = (size+nrows-1) // nrows
+            ncols = (size + nrows - 1) // nrows
             colwidths = []
             totwidth = -2
             for col in range(ncols):
                 colwidth = 0
                 for row in range(nrows):
-                    i = row + nrows*col
+                    i = row + nrows * col
                     if i >= size:
                         break
                     x = list[i]
@@ -303,7 +304,7 @@ class Cmd:
         for row in range(nrows):
             texts = []
             for col in range(ncols):
-                i = row + nrows*col
+                i = row + nrows * col
                 if i >= size:
                     x = ""
                 else:
@@ -313,4 +314,4 @@ class Cmd:
                 del texts[-1]
             for col in range(len(texts)):
                 texts[col] = texts[col].ljust(colwidths[col])
-            self.stdout.write("%s\n"%str("  ".join(texts)))
+            self.stdout.write("%s\n" % str("  ".join(texts)))

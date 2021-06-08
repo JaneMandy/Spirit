@@ -13,12 +13,6 @@ def to_unicode(obj):
 	return obj
 
 
-
-
-
-
-
-
 class Framework(Cmd):
     completekey = "tab"
     prompt="%s >"
@@ -55,10 +49,12 @@ class Framework(Cmd):
 
 
     extra_modules_dirs="exploit/windows/pss"
+    
     def __init__(self):
         Cmd.__init__(self)
         self.mswindows = (sys.platform == "win32")
         self.prompt = "%s >"%self.promptName
+    
     def Init(self):
         print_msg("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
         print_msg("=                                                           =")
@@ -74,6 +70,7 @@ class Framework(Cmd):
         except KeyboardInterrupt as Error:
             print_success("Bye Bye")
             exit()
+    
     def CheckLib(self):
         print_msg("Check Import Python Modules ")
         try:
@@ -96,7 +93,7 @@ class Framework(Cmd):
             print_success("Check PyModules Successfuly")
 
 
-###########################################################
+    ###########################################################
     #Modules Load
     def load_Payload(self, rootPath=''):
         """
@@ -220,7 +217,8 @@ class Framework(Cmd):
 
     def r_bool(self, value):
         return {'true': True, 'false': False}[value.lower()]
-###############################################################################
+    
+    ###############################################################################
     def cmdloop(self, intro=None):
         """Repeatedly issue a prompt, accept input, parse an initial prefix
         off the received input, and dispatch to action methods, passing them
@@ -292,18 +290,6 @@ class Framework(Cmd):
 
         """
         print_error('Unknown Command: %s\n'%line,time=0)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
