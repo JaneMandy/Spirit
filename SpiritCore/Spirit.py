@@ -1,12 +1,34 @@
+'''Copyright (C) 2021 3he11
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+    Buffer Overflow Attack
+    Domain Penetration
+    Web Security
+    Pwn  Recverse Engineering
+
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+'''
+
+
 from SpiritCore.FCmd import *
+from SpiritCore.Session import *
 from SpiritCore.System import *
 from SpiritCore.Payload import *
 from SpiritCore.Config import *
-import fnmatch,os,imp
+from multiprocessing import Event
+import fnmatch,os,imp,uuid,getopt
+
 
 #34
-
-
 
 
 def to_unicode(obj):
@@ -52,6 +74,10 @@ class Framework(Cmd):
 
     PayloadParameate={}
 
+    JobsThread={}
+    SessionManager={}
+    ModulesThread ={}
+    FrameworkEvent=None
 
 
     extra_modules_dirs="exploit/windows/pss"
@@ -59,6 +85,8 @@ class Framework(Cmd):
         Cmd.__init__(self)
         self.mswindows = (sys.platform == "win32")
         self.prompt = "%s >"%self.promptName
+        self.FrameworkEvent=Event()
+        self.FrameworkEvent.set()
     def Init(self):
         print_msg("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
         print_msg("=                                                           =")
@@ -85,15 +113,19 @@ class Framework(Cmd):
             except:
                 print_error("Install readline")
                 exit()
+
             #import impacket
             #import keystone
             #import capstone
+            #import keystone
             #import ctypes
+
+
         except Exception as error:
-            print_error("Import Error:%s"%error)
+            print_error("Import Error:%s"%error.__str__())
             exit()
         else:
-            print_success("Check PyModules Successfuly")
+            print_success("Check PyModules successfully")
 
 
 ###########################################################
@@ -143,7 +175,22 @@ class Framework(Cmd):
             exit()
         else:
             pass
-
+    def do_gen(self,line):
+        if line=="":
+            write("gen -t <Type> -o <output file>")
+        opts, args = getopt.getopt(line.split(" "), "ht:o:", ["type=", "output="])
+        for opt, arg in opts:
+            if opt == '-h':
+                print_msg("Upload -f <Local File> -o <Upload Path>")
+                return
+            elif opt in ("-o", "-output"):
+                output = arg
+            if self.UseModules==True:
+                try:
+                    self.UseModulesObject.Generate(output)
+                    print_success("Write Successfully")
+                except:
+                    pass
     def load_modules(self, rootPath=''):
         """
         Load Empire modules from a specified path, default to
@@ -245,6 +292,7 @@ class Framework(Cmd):
             stop = None
             while not stop:
                 line=""
+                self.FrameworkEvent.wait()
                 if self.cmdqueue:
                     line = self.cmdqueue.pop(0)
                 else:
@@ -304,7 +352,21 @@ class Framework(Cmd):
 
 
 
-
+    def do_help(self,line):
+        print_msg("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
+        print_msg("=                                                           =")
+        print_msg("=                     " + TextColor("ZSD   Spirit   Mike", COLO_YELLOW) + "                   =")
+        print_msg("=               " + TextColor("MichaelHenryRumsfeld@Gmail.com", COLO_RED) + "              =")
+        print_msg("=                                                           =")
+        print_msg("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
+        Text='''
+            help          Get help information 
+            use           Use Specific modules
+            set           Change parameters
+            show          View Parameters
+            info          Get Mod information
+            gen           Generate Payload 
+        '''
 
 
 
@@ -370,8 +432,10 @@ class Framework(Cmd):
                     # print("d")
                     if self.UseModulesObject.Info["Payload"]:
                         self.UsePayload = True
+                        #print(self.Payload[self.UseModulesObject.Info["Payload"][0]])
                         self.UsePayloadObject = self.Payload[self.UseModulesObject.Info["Payload"][0]]
                         self.PayloadParameate = self.UsePayloadObject.GetParameate(self.UsePayloadObject.Name)
+                        #print(self.PayloadParameate)
                         # print(self.UseModulesObject.Info["Payload"][0])
 
                 except Exception as error:
@@ -423,7 +487,7 @@ class Framework(Cmd):
 
 
                 except Exception as error:
-                    print(error)
+                    pass
 
 
     def do_set(self,line):
@@ -441,6 +505,26 @@ class Framework(Cmd):
                 value = ' '.join(options[1:])
                 self.UsePayloadObject.Values[name] = value
                 print_success('%s => %s' % (name, value))
+            elif name=="Payload" or name=="payload":
+                value = ' '.join(options[1:])
+                try:
+                    # print("d")
+                    if self.UseModulesObject.Info["Payload"]:
+                        self.UsePayload = True
+                        #print(self.Payload[self.UseModulesObject.Info["Payload"][0]])
+                        try:
+                            self.UsePayloadObject = self.Payload[value]
+                            self.PayloadParameate = self.UsePayloadObject.GetParameate(self.UsePayloadObject.Name)
+                            #print_error("s")
+                        except:
+                            print_error("Set Payload Failed:%s"%value)
+                            return
+                        #print(self.PayloadParameate)
+                        # print(self.UseModulesObject.Info["Payload"][0])
+
+                except Exception as error:
+                    #print(error)
+                    self.UsePayload = False
         try:
             if self.UseModulesObject.DEFINE:
                 self.condition = self.UseModulesObject.DEFINE.keys()
@@ -566,6 +650,7 @@ class Framework(Cmd):
         try:
             if self.UseModulesObject.DEFINE:
                 self.condition = self.UseModulesObject.DEFINE.keys()
+
                 for key in self.condition:
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
@@ -604,13 +689,15 @@ class Framework(Cmd):
                                 # self.clear()
                         print('')
         except Exception as error:
-            print(error)
+            pass
         try:
             if self.UsePayload == True:
                 write("==========================Payload:%s================================" % (
                 TextColor(self.UsePayloadObject.Name)))
                 pattern = '%s%%s  %%s  %%s  %%s' % (spacer)
+
                 key_len = len(max(self.PayloadParameate, key=len))
+                #print(self.PayloadParameate)
                 if key_len < 4: key_len = 4
                 try:
                     val_len = len(max([to_unicode(self.PayloadParameate[x]) for x in self.PayloadParameate], key=len))
@@ -627,9 +714,9 @@ class Framework(Cmd):
                     desc = self.UsePayloadObject.description[key]
                     try:
                         write(pattern % (
-                        key.upper().ljust(key_len), to_unicode(value).ljust(val_len), to_unicode(reqd).ljust(8), desc))
-                    except AttributeError:
-                        pass
+                        key.ljust(key_len), to_unicode(str(value)).ljust(val_len), to_unicode(reqd).ljust(8), desc))
+                    except Exception as error:
+                        print(error)
                         #self.clear()
                 print('')
         except Exception as e:
@@ -637,6 +724,21 @@ class Framework(Cmd):
 
     def complete_set(self, text, line, begidx, endidx):
         if len(line.split(' '))==3:
+            try:
+                parame=line.split(' ')[1]
+                #print(parame)
+                if self.UsePayload==True:
+                    if parame=="payload" or parame=="Payload":
+                        #print_error("d")
+                        ChoinsPame= self.Payload.keys()
+                        end_line = ' '.join(line.split(' ')[1:])
+
+                        mline = end_line.partition(' ')[2]
+                        offs = len(mline) - len(text)
+                        return [s[offs:] for s in ChoinsPame if s.startswith(mline)]
+            except Exception as error:
+                pass
+
             try:
                 parame=line.split(' ')[1]
                 if self.Choins[parame]!=None:
@@ -650,6 +752,9 @@ class Framework(Cmd):
             except Exception as error:
                 pass
         SetKey=[]
+        if self.UsePayload==True:
+            SetKey.append("Payload")
+            SetKey.append("payload")
         for key in sorted(self.Values):
             SetKey.append(key)
         if self.UsePayload==True:
@@ -691,6 +796,30 @@ class Framework(Cmd):
             options = ["modules", "payload"]
         return [x for x in options if x.startswith(text)]
 
+    def complete_session(self, text, line, begidx, endidx):
+        try:
+            options=list(self.SessionManager.keys())
+            options.append("l")
+            return [x for x in options if x.startswith(text)]
+        except Exception as error:
+            print(error)
+    def do_session(self,line):
+        if line=="l" or line=="":
+            print_success("Show Session List")
+            write(" SESSION UUID                              Session Recv       -")
+
+            if self.SessionManager!={}:
+                for key in self.SessionManager:
+                    write("%s  -  %s "%(self.SessionManager[key].UUID,self.SessionManager[key].SessionInfo))
+            else:
+                write("NULL ")
+        else:
+            try:
+                self.SessionManager[line].Console()
+            except:
+                print_error("%s Unknown Session "%line)
+
+
 
 
 
@@ -708,13 +837,16 @@ class Framework(Cmd):
             write(helper)
             return
         try:
-            self.UseModulesObject.Status=0
-            self.UseModulesObject.ExploitInit()
-            self.UseModulesObject.Exploit()
-            if self.UseModulesObject.Status==0:
-                print_success("Modules Run Successfuly")
+            if self.UseModules==True:
+                self.UseModulesObject.Status=0
+                self.UseModulesObject.ExploitInit()
+                self.UseModulesObject.Exploit()
+                if self.UseModulesObject.Status==0:
+                    print_success("Modules Run successfully")
+                else:
+                    print_error("Error Code:%d"%self.UseModulesObject.Status)
             else:
-                print_error("Error Code:%d"%self.UseModulesObject.Status)
+                print_msg("Please use the module first")
         except Exception as error:
             print(error)
 

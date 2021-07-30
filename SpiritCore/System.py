@@ -77,7 +77,11 @@ class Parame:
 
 
 
-
+def VerPython3():
+    if sys.version_info.major == 2:
+        return False
+    else:
+        return True
 
 def formattime(self,timestamp=None):
 	if timestamp is None:
@@ -153,6 +157,23 @@ def colorize(line):
             line[r:])
             return line
     return line
+
+def input_chions(default,name,Parame,Des):
+    print_success("%s :: %s"%(name,Des))
+    write("")
+    for key in Parame:
+        write(" %s)      %s"%(str(key),Parame[key]))
+    prompt="%s %s [%s] : "%(TextColor("[?]",COLO_BLUE),name,str(default))
+    write("")
+    if sys.version_info.major == 2:
+        line = raw_input(prompt)
+        # print(line)
+    else:
+        line = str(input(prompt))
+    if line in Parame.keys():
+        return line
+    else:
+        return default
 
 def write( line,end="\n"):
     try:

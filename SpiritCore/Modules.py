@@ -19,6 +19,7 @@ class Modules:
         if self.Object.UsePayload == True:
             for key in sorted(self.Object.PayloadParameate):
                 self.Parameate.update({key:self.Object.PayloadParameate[key]})
+                self.Object.UsePayloadObject.Parameate.update({key:self.Object.PayloadParameate[key]})
         try:
             if self.Object.UseModulesObject.DEFINE:
                 self.condition = self.Object.UseModulesObject.DEFINE.keys()
