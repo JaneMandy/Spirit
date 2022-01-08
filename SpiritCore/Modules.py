@@ -31,7 +31,7 @@ class Modules:
                     Tiao = self.Object.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
 
-                    if self.Object.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Object.Values[TiaoKey] == Tiao[TiaoKey]:
                         for key in sorted(self.Object.DEFINE[TiaoKey].Values):
                             #write(key)
                             self.Parameate.update({key: str(self.Object.DEFINE[TiaoKey].Values[key])})
