@@ -502,7 +502,7 @@ class Framework(Cmd):
                             Tiao = self.UseModulesObject.DEFINE[key]
                             TiaoKey=list(Tiao.keys())[0]
 
-                            if self.Values[TiaoKey]!=Tiao[TiaoKey]:
+                            if self.Values[TiaoKey]==Tiao[TiaoKey]:
                                 Obj = Parame()
                                 Obj.Inti(self)
                                 Obj.Name=key
@@ -580,7 +580,7 @@ class Framework(Cmd):
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
                     OpName=TiaoKey
-                    if self.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Values[TiaoKey] == Tiao[TiaoKey]:
                         if name in self.DEFINE[OpName].Values:
                             value = ' '.join(options[1:])
                             self.DEFINE[OpName].Values[name] = value
@@ -602,7 +602,7 @@ class Framework(Cmd):
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
 
-                    if self.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Values[TiaoKey] == Tiao[TiaoKey]:
                         try:
                             if self.DEFINE[key].Name!=key:
                                 write(1)
@@ -703,7 +703,7 @@ class Framework(Cmd):
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
                     OpName=TiaoKey
-                    if self.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Values[TiaoKey] == Tiao[TiaoKey]:
                         #write(1)
                         #if name in self.DEFINE[OpName].Values:
                         ##    self.DEFINE[OpName].Values[name] = value
@@ -815,7 +815,7 @@ class Framework(Cmd):
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
                     OpName = TiaoKey
-                    if self.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Values[TiaoKey] == Tiao[TiaoKey]:
                         for key in sorted(self.DEFINE[OpName].Values):
                             SetKey.append(key)
 
