@@ -156,7 +156,7 @@ class Cmd:
         return cmd, arg, line
 
     def onecmd(self, line):
-        #print(line)
+        #write(line)
         """Interpret the argument as though it had been typed in response
         to the prompt.
 

@@ -9,7 +9,11 @@ Xray=""
 #   SQLMAP PATH
 Sqlmap=""
 
-#
+
+
+
+
+
 
 
 

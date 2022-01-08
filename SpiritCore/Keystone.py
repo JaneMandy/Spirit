@@ -17,8 +17,19 @@ SPARC32 = 'sparc32'
 SPARC64 = 'sparc64'
 SYSTEMZ = 'systemz'
 #x86 x64
-
-
+def shellcodecpphex(xor):
+    shellcode = ''
+    try:
+        for code in xor:
+            code_hex = hex(code)
+            code_hex = code_hex.replace('0x', '')
+            if (len(code_hex) == 1):
+                code_hex = '0' + code_hex
+            shellcode += r'\x' + code_hex
+    except Exception as e:
+        print(e)
+    shellcodes = "shellcode[] = \"" + shellcode + "\""
+    return shellcodes
 
 def hex2bytes(s):
     rbytes = ''

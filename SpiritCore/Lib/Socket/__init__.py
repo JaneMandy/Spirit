@@ -22,14 +22,14 @@ class Socket(socket):
         try:
             if sys.version_info.major == 3:
                 self.send(Data.encode('gbk'))
-                #print(Data)
+                #write(Data)
             elif sys.version_info.major == 2:
                 self.Send(Data)
         except Exception as error:
-            print(error)
+            write(error)
     def Recv(self,Size):
         if sys.version_info.major == 3:
             return str(self.recv(Size),encoding="gbk")
-                # print(Data)
+                # write(Data)
         elif sys.version_info.major == 2:
             return  self.recv(Size)

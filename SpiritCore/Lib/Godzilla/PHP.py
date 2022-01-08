@@ -123,6 +123,9 @@ function LD_PRELOAD(){
 
 
 
+
+
+
 function deleteDir($p){
     $m=@dir($p);
     while(@$f=$m->read()){

@@ -1,55 +1,37 @@
-#Spirit-Framework ZSD v1.0.2
-***
-Add MS17-010(github.com/worawit)
-
-DoublePulsar (SC sub-assembly reference:http://bobao.360.cn/member/contribute?uid=2554610746)
-
-PHP WebShell (reference:Godzila) (Disable Function Support:Linux) backdoor/php/backdoor
-
-Ring3 ShellCode Add windows/bind_shell_tcp (test)
-
-Shell Session Manager :exploit/multi/handler
-***
- Because of functional requirements,don't do too much optimization first
- Many Functions of this update are not encapsulated.
-
-CVE-2020-0796 Not Exploit 
+#Spirit-Framework ZSD v1.0.5
+###Version:1.0.5    By:ZSD 3he11
 ***
 
-Version:1.0.2    By:ZSD 3he11
+以MSF为参考制作的渗透框架，目前功能并不是非常完善。还有很多bug，谅大佬们多多海涵。
 
-Support Platform:Windows Linux MacOS
+目前版本：支持 后门/shellcode 生成，端口扫描，爬虫信息收集(rad)，Web漏洞扫描（基于xray），FOFA搜索。
 
+漏洞利用目前只支持CVE-2020-0796 MS17-010
 
-
-Python:2x ,3x
-Recommend:Python 3x
+***
+  生成EXE DLL格式后门需要安装cmake Mingw-W64
 ***
 
-##Update Inf
-###1. Fix some bug
-###2. Increase Modules load
-###3. Support set show exploit command
 
-
-##Modules kit
+##模块开发
 ~~~
 from SpiritCore.Modules import *
 class Module(Modules):
 	Info = {
-		"Name": "Moduels",
-		"Author": "Kit Name",
+		"Name": "Moduels Name",
+		"Author": "Author Name",
 		"Description": "Test ",
 		"Options": (
-			("ParameaterName", "Values", True, 'Description'),
+			("ParameaterName", "Values", True, 'Description',None),# 普通参数，但是加入了下面DEFINE条件区，所以变成条件参数
+			("Prtolo", "SMB", True, 'Description',["SMB","RPC"]), #多选参数。通过使用TAB按键填充
 		),         
 		"Payload":["Payload","Description"],  #Need to be add
-		"ConParame": (
+		"ConParame": (#需要条件的参数组，可以设置成代理等等
 			("Parame", "Values", True, "Descripttion"),
 		),
 
      }
-	DEFINE = {
+	DEFINE = { #条件内容
 		"ConParame": {"ParameaterName": "Values"}
 	}
 
@@ -60,8 +42,8 @@ class Module(Modules):
 
 ~~~
 
+如果ParameaterName内容为Values，那么ConParame就会可以使用。
 
-The part requires DEFINE value as a condition
 ~~~~
 "ConParame": (
 			("Parame", "Values", True, "Descripttion"),
@@ -70,11 +52,18 @@ The part requires DEFINE value as a condition
 
 
 
-Install:
-~~~~
-Python-pyreadline   (Support GetOutputFile) 
-Python-impacket
-Python-keystone
+###安装:
 
+#####安装组件
+~~~~
+sudo apt install mingw-w64
+sudo apt install cmake
 ~~~~
 
+
+#####Python模块安装
+~~~~
+Python-pyreadline   (Support GetOutputFile Windows需要安装)
+Python-impacket    （如果对MS17-010进行利用，那么需要安装）
+Python-keystone 	（目前版本并不运用所以不用安装。）
+~~~~

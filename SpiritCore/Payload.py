@@ -1,5 +1,4 @@
 from SpiritCore.System import *
-from keystone import*
 
 
 class ShellCode:

