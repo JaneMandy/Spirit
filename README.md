@@ -7,7 +7,9 @@
 更新信息：v1.0.5-rc2
 
   添加了exit命令 与退出问题。 
+  
   添加了search命令 以描述信息与模块名为标准搜索
+  
   修复了SpiritCore.Spirit里面的load_modules函数 异常处理问题。
 
 ***
