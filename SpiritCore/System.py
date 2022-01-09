@@ -1,5 +1,6 @@
 import  sys
 import  datetime
+from SpiritCore.Lib.gol import *
 try:
     try:
         import readline
@@ -167,15 +168,33 @@ def input_chions(default,name,Parame,Des):
     write("")
     if sys.version_info.major == 2:
         line = raw_input(prompt)
-        # print(line)
+        # write(line)
     else:
         line = str(input(prompt))
     if line in Parame.keys():
         return line
     else:
         return default
-
+def WriteLogs(line,end="\n"):
+    try:
+        LogData=b""
+        LogData=open(get_value('LogsFilePath'),"rb").read()
+    except:
+        pass
+    try:
+        open(get_value('LogsFilePath'),"wb").write(LogData+bytes("\n"+TimeDate()+"\t"+line+end,encoding="utf-8"))
+    except:
+        pass
 def write( line,end="\n"):
+    try:
+        LogData=b""
+        LogData=open(get_value('LogsFilePath'),"rb").read()
+    except:
+        pass
+    try:
+        open(get_value('LogsFilePath'),"wb").write(LogData+bytes(line+end,encoding="utf-8"))
+    except:
+        pass
     try:
         if mswindows:
             readline.GetOutputFile().write_color(colorize(line)+end)
@@ -184,7 +203,7 @@ def write( line,end="\n"):
     except LookupError:
          # We failed to print in color.  This is a problem looking up the encoding
         # Permanently disable color and continue
-        print(line)
+        write(line)
 
 def print_error( line,time=1):
     if time==0:

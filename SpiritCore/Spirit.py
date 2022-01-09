@@ -19,6 +19,7 @@ limitations under the License.
 '''
 
 
+from posixpath import expanduser
 from SpiritCore.FCmd import *
 from SpiritCore.Session import *
 from SpiritCore.System import *
@@ -36,8 +37,22 @@ def to_unicode(obj):
 
 
 
-
-
+import ctypes,inspect
+def _async_raise(tid, exctype):
+    """raises the exception, performs cleanup if needed"""
+    tid = ctypes.c_long(tid)
+    if not inspect.isclass(exctype):
+        exctype = type(exctype)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
+    if res == 0:
+        raise ValueError("invalid thread id")
+    elif res != 1:
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+ 
+ 
+def stop_thread(thread):
+    _async_raise(thread.ident, SystemExit)
 
 
 
@@ -100,8 +115,21 @@ class Framework(Cmd):
         try:
             self.cmdloop()
         except KeyboardInterrupt as Error:
+            write("")
+            '''for session in self.SessionManager.keys():
+                try:
+                    stop_thread(self.SessionManager[session].ListThread)
+                    try:
+                        self.SessionManager[session].ListThread._shutdown()
+                    except Exception as error:
+                        print_error(error.__str__())
+                except Exception as error:
+                    print_error(error.__str__())'''
             print_success("Bye Bye")
-            exit()
+            try:
+                sys.exit() 
+            except:
+                exit()    
     def CheckLib(self):
         print_msg("Check Import Python Modules ")
         try:
@@ -136,7 +164,7 @@ class Framework(Cmd):
         installPath + "/lib/modules/*"
         """
 
-        #print(rootPath)
+        #write(rootPath)
         pattern = '*.py'
         print_msg("Loading Payload from: %s" % (rootPath))
         try:
@@ -150,7 +178,8 @@ class Framework(Cmd):
 
                     # extract just the module name from the full path
                     moduleName = filePath.split(rootPath)[-1][0:-3]
-                    #print(rootPath)
+                    moduleName=moduleName.replace("\\","/")   #Framework Console use /  
+                    #write(rootPath)
 
                     try:
                     # instantiate the module and save it to the internal cache
@@ -170,34 +199,49 @@ class Framework(Cmd):
                         self.PayloadCount+=1
                         self.PayloadList.append(moduleName)
         except Exception as error:
-            ErrorInfo = "Error:%s" % (error.__str__())
-            print_error(ErrorInfo)
-            exit()
+            ErrorInfos = "Error:%s" % (error.__str__())
+            print_error(ErrorInfos)
         else:
             pass
-    def do_gen(self,line):
+    def do_generate(self,line):
+        output=""
+        filetype=""
         if line=="":
             write("gen -t <Type> -o <output file>")
-        opts, args = getopt.getopt(line.split(" "), "ht:o:", ["type=", "output="])
+        try:
+            opts, args = getopt.getopt(line.split(" "), "ht:o:", ["type=", "output="])
+            #print(args)
+        except:
+            write("gen -t <Type> -o <output file>")
+            return
         for opt, arg in opts:
             if opt == '-h':
-                print_msg("Upload -f <Local File> -o <Upload Path>")
+                print_msg("gen -t <Local File> -o <Upload Path>")
                 return
             elif opt in ("-o", "-output"):
                 output = arg
-            if self.UseModules==True:
+            elif opt in ("-t","-type"):
+                filetype=arg
+        if self.UseModules==True:
+            if output=="":
+                print_msg("Output File is Empty")
+                return
+            try:
+                self.UseModulesObject.ExploitInit()
                 try:
-                    self.UseModulesObject.Generate(output)
-                    print_success("Write Successfully")
+                    self.UseModulesObject.Generate(output,filetype)
                 except:
-                    pass
+                    print_msg("The Modules Not support Generate File")
+                print_success("Write Successfully")
+            except:
+                pass
     def load_modules(self, rootPath=''):
         """
         Load Empire modules from a specified path, default to
         installPath + "/lib/modules/*"
         """
-
-        #print(rootPath)
+        WriteLogs("Load Local Modules Path:%s"%rootPath)
+        #write(rootPath)
         pattern = '*.py'
         print_msg("Loading modules from: %s" % (rootPath))
         try:
@@ -211,7 +255,7 @@ class Framework(Cmd):
 
                     # extract just the module name from the full path
                     moduleName = filePath.split(rootPath)[-1][0:-3]
-                    #print(rootPath)
+                    #write(rootPath)
 
                     try:
                     # instantiate the module and save it to the internal cache
@@ -226,13 +270,14 @@ class Framework(Cmd):
                     #self.modules[moduleName].Execute()
                     except Exception as Error:
                         ErrorInfo="Load %s ---- %s"%(moduleName,Error.__str__())
+                        WriteLogs(ErrorInfo)
                         print_error(ErrorInfo)
                     else:
                         self.ModulesCount+=1
                         self.ModulesList.append(moduleName)
         except Exception as error:
-            ErrorInfo = "Error:%s" % (error.__str__())
-            print_error(ErrorInfo)
+            ErrorInfos = "Error:%s" % (error.__str__())
+            print_error(ErrorInfos)
             exit()
         else:
             print_success("Moules Loaded Count:%d"%self.ModulesCount)
@@ -300,7 +345,7 @@ class Framework(Cmd):
                         try:
                             if sys.version_info.major==2:
                                 line = raw_input(self.prompt)
-                                #print(line)
+                                #write(line)
                             else:
                                 line = str(input(self.prompt))   #stdout stdin Not Support TAB Key
                                 '''sys.stdout.write(self.prompt)
@@ -393,6 +438,7 @@ class Framework(Cmd):
     #         use
     #         exit
     def do_use(self,line):
+        WriteLogs("Run Modules Exploit Function:%s"%line)
         print_msg("USE MODULES")
         try:
             ModulesObj=self.modules[line]
@@ -426,20 +472,20 @@ class Framework(Cmd):
                     try:
                         self.r_option(*options)
                     except Exception as error:
-                        print(error)
+                        write(error)
 
                 try:
-                    # print("d")
+                    # write("d")
                     if self.UseModulesObject.Info["Payload"]:
                         self.UsePayload = True
-                        #print(self.Payload[self.UseModulesObject.Info["Payload"][0]])
+                        #write(self.Payload[self.UseModulesObject.Info["Payload"][0]])
                         self.UsePayloadObject = self.Payload[self.UseModulesObject.Info["Payload"][0]]
                         self.PayloadParameate = self.UsePayloadObject.GetParameate(self.UsePayloadObject.Name)
-                        #print(self.PayloadParameate)
-                        # print(self.UseModulesObject.Info["Payload"][0])
+                        #write(self.PayloadParameate)
+                        # write(self.UseModulesObject.Info["Payload"][0])
 
                 except Exception as error:
-                    #print(error)
+                    #write(error)
                     self.UsePayload = False
 
 
@@ -454,17 +500,17 @@ class Framework(Cmd):
                             Tiao = self.UseModulesObject.DEFINE[key]
                             TiaoKey=list(Tiao.keys())[0]
 
-                            if self.Values[TiaoKey]!=Tiao[TiaoKey]:
+                            if self.Values[TiaoKey]==Tiao[TiaoKey]:
                                 Obj = Parame()
                                 Obj.Inti(self)
                                 Obj.Name=key
-                                #print(1)
-                                #print( self.UseModulesObject.DEFINE.get(key))
+                                #write(1)
+                                #write( self.UseModulesObject.DEFINE.get(key))
                                 for option in self.UseModulesObject.Info.get(key):
                                     try:
                                         Obj.r_option(*option)
                                     except Exception as error:
-                                        print(error)
+                                        write(error)
                                         helper='''
                                             Check Options Pameatre Formcat 
                                              "Op1":(
@@ -489,7 +535,10 @@ class Framework(Cmd):
                 except Exception as error:
                     pass
 
-
+    def do_exit(self,line):
+        print_msg("Exit Spirit")
+        exit()
+    
     def do_set(self,line):
         options = line.split()
         if len(options) < 2:
@@ -499,7 +548,7 @@ class Framework(Cmd):
             value = ' '.join(options[1:])
             self.Values[name] = value
             print_success('%s => %s'%(name,value))
-
+        WriteLogs("Set:%s"%line)
         if self.UsePayload==True:
             if name in self.UsePayloadObject.Values:
                 value = ' '.join(options[1:])
@@ -508,10 +557,10 @@ class Framework(Cmd):
             elif name=="Payload" or name=="payload":
                 value = ' '.join(options[1:])
                 try:
-                    # print("d")
+                    # write("d")
                     if self.UseModulesObject.Info["Payload"]:
                         self.UsePayload = True
-                        #print(self.Payload[self.UseModulesObject.Info["Payload"][0]])
+                        #write(self.Payload[self.UseModulesObject.Info["Payload"][0]])
                         try:
                             self.UsePayloadObject = self.Payload[value]
                             self.PayloadParameate = self.UsePayloadObject.GetParameate(self.UsePayloadObject.Name)
@@ -519,11 +568,11 @@ class Framework(Cmd):
                         except:
                             print_error("Set Payload Failed:%s"%value)
                             return
-                        #print(self.PayloadParameate)
-                        # print(self.UseModulesObject.Info["Payload"][0])
+                        #write(self.PayloadParameate)
+                        # write(self.UseModulesObject.Info["Payload"][0])
 
                 except Exception as error:
-                    #print(error)
+                    #write(error)
                     self.UsePayload = False
         try:
             if self.UseModulesObject.DEFINE:
@@ -532,7 +581,7 @@ class Framework(Cmd):
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
                     OpName=TiaoKey
-                    if self.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Values[TiaoKey] == Tiao[TiaoKey]:
                         if name in self.DEFINE[OpName].Values:
                             value = ' '.join(options[1:])
                             self.DEFINE[OpName].Values[name] = value
@@ -540,7 +589,7 @@ class Framework(Cmd):
 
 
         except Exception as error:
-            #print(error)
+            #write(error)
             pass
 
         try:
@@ -554,21 +603,21 @@ class Framework(Cmd):
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
 
-                    if self.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Values[TiaoKey] == Tiao[TiaoKey]:
                         try:
                             if self.DEFINE[key].Name!=key:
-                                print(1)
+                                write(1)
                         except:
                             Obj = Parame()
                             Obj.Inti(self)
                             Obj.Name = key
-                            # print(1)
-                            # print( self.UseModulesObject.DEFINE.get(key))
+                            # write(1)
+                            # write( self.UseModulesObject.DEFINE.get(key))
                             for option in self.UseModulesObject.Info.get(key):
                                 try:
                                     Obj.r_option(*option)
                                 except Exception as error:
-                                    print(error)
+                                    write(error)
                                     helper = '''
                                                                                                                     Check Options Pameatre Formcat 
                                                                                                                      "Op1":(
@@ -594,11 +643,31 @@ class Framework(Cmd):
 
 
         except Exception as error:
-            #print(error)
+            #write(error)
             pass
 
-
-
+    def do_search(self,line):
+        print_msg("Search Modules:%s"%line)
+        COunt=0
+        modlename=""
+        module_names = self.ModulesList
+        print_msg("Search Modules Name")
+        for modlename in module_names:
+            if line.lower() in modlename.lower():
+                writetext=modlename.replace(line,TextColor(line,COLOR_ATT=COLO_RED))
+                write(writetext)
+                COunt+=1
+        write("\n")
+        print_msg("Search Description")
+        for modlename in module_names:
+            ModulesObj=self.modules[modlename]
+            Description = ModulesObj.Info.get("Description")
+            if line.lower() in Description.lower():
+                writetext=Description.replace(line,TextColor(line,COLOR_ATT=COLO_RED))
+                write(modlename)
+                write("\t%s"%writetext)
+                COunt+=1
+        print_success("Search Successfully Count:%d"%COunt)
     def complete_use(self, text, line, begidx, endidx):
 
         module_names = self.ModulesList
@@ -641,11 +710,11 @@ class Framework(Cmd):
                     write(pattern % (
                     key.ljust(key_len), to_unicode(str(value)).ljust(val_len), to_unicode(reqd).ljust(8), desc))
                 except Exception as error:
-                    print(error)
+                    write(error)
                     #self.clear()
-            print('')
+            write('')
         else:
-            print('\n%sNo options available for this module\n' % (spacer))
+            write('\n%sNo options available for this module\n' % (spacer))
             return
         try:
             if self.UseModulesObject.DEFINE:
@@ -655,8 +724,8 @@ class Framework(Cmd):
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
                     OpName=TiaoKey
-                    if self.Values[TiaoKey] != Tiao[TiaoKey]:
-                        #print(1)
+                    if self.Values[TiaoKey] == Tiao[TiaoKey]:
+                        #write(1)
                         #if name in self.DEFINE[OpName].Values:
                         ##    self.DEFINE[OpName].Values[name] = value
                         write("======================  %s  ================================" % (
@@ -667,13 +736,13 @@ class Framework(Cmd):
                         try:
                             val_len = len(max([to_unicode(self.DEFINE[OpName].Values[x]) for x in self.DEFINE[OpName].Values], key=len))
                         except Exception:
-                            #print("d")
+                            #write("d")
                             val_len = 13
                         if val_len < 13: val_len = 13
-                        print('')
-                        print(pattern % (
+                        write('')
+                        write(pattern % (
                         'Name'.ljust(key_len), 'Current Value'.ljust(val_len), 'Required', 'Description'))
-                        print(
+                        write(
                             pattern % (
                             self.ruler * key_len, (self.ruler * 13).ljust(val_len), self.ruler * 8, self.ruler * 11))
                         for key in sorted(self.DEFINE[OpName].Values):
@@ -687,7 +756,7 @@ class Framework(Cmd):
                             except AttributeError:
                                 pass
                                 # self.clear()
-                        print('')
+                        write('')
         except Exception as error:
             pass
         try:
@@ -697,16 +766,16 @@ class Framework(Cmd):
                 pattern = '%s%%s  %%s  %%s  %%s' % (spacer)
 
                 key_len = len(max(self.PayloadParameate, key=len))
-                #print(self.PayloadParameate)
+                #write(self.PayloadParameate)
                 if key_len < 4: key_len = 4
                 try:
                     val_len = len(max([to_unicode(self.PayloadParameate[x]) for x in self.PayloadParameate], key=len))
                 except Exception:
                     val_len = 13
                 if val_len < 13: val_len = 13
-                print('')
-                print(pattern % ('Name'.ljust(key_len), 'Current Value'.ljust(val_len), 'Required', 'Description'))
-                print(
+                write('')
+                write(pattern % ('Name'.ljust(key_len), 'Current Value'.ljust(val_len), 'Required', 'Description'))
+                write(
                     pattern % (self.ruler * key_len, (self.ruler * 13).ljust(val_len), self.ruler * 8, self.ruler * 11))
                 for key in sorted(self.PayloadParameate):
                     value = self.PayloadParameate[key] if self.PayloadParameate[key] != None else ""
@@ -716,9 +785,9 @@ class Framework(Cmd):
                         write(pattern % (
                         key.ljust(key_len), to_unicode(str(value)).ljust(val_len), to_unicode(reqd).ljust(8), desc))
                     except Exception as error:
-                        print(error)
+                        write(error)
                         #self.clear()
-                print('')
+                write('')
         except Exception as e:
             print_error(e)
 
@@ -726,7 +795,7 @@ class Framework(Cmd):
         if len(line.split(' '))==3:
             try:
                 parame=line.split(' ')[1]
-                #print(parame)
+                #write(parame)
                 if self.UsePayload==True:
                     if parame=="payload" or parame=="Payload":
                         #print_error("d")
@@ -767,7 +836,7 @@ class Framework(Cmd):
                     Tiao = self.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
                     OpName = TiaoKey
-                    if self.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Values[TiaoKey] == Tiao[TiaoKey]:
                         for key in sorted(self.DEFINE[OpName].Values):
                             SetKey.append(key)
 
@@ -780,6 +849,7 @@ class Framework(Cmd):
             print_msg("-----------Show Modules ---------------------------")
             for name in self.ModulesList:
                 write(" "+name+"\n")
+            return
         self.show_options()
 
     def complete_show(self, text, line, begidx, endidx):
@@ -802,21 +872,24 @@ class Framework(Cmd):
             options.append("l")
             return [x for x in options if x.startswith(text)]
         except Exception as error:
-            print(error)
+            write(error)
     def do_session(self,line):
         if line=="l" or line=="":
             print_success("Show Session List")
             write(" SESSION UUID                              Session Recv       -")
 
             if self.SessionManager!={}:
-                for key in self.SessionManager:
-                    write("%s  -  %s "%(self.SessionManager[key].UUID,self.SessionManager[key].SessionInfo))
+                for key in self.SessionManager.keys():
+                    write("%s  -  %s "%(key,self.SessionManager[key].SessionInfo))
             else:
                 write("NULL ")
         else:
             try:
-                self.SessionManager[line].Console()
-            except:
+                if line in self.SessionManager.keys():
+                    self.SessionManager[line].Console(line)
+                    
+            except Exception as error:
+                write(error)
                 print_error("%s Unknown Session "%line)
 
 
@@ -840,7 +913,10 @@ class Framework(Cmd):
             if self.UseModules==True:
                 self.UseModulesObject.Status=0
                 self.UseModulesObject.ExploitInit()
-                self.UseModulesObject.Exploit()
+                try:
+                    self.UseModulesObject.Exploit()
+                except Exception as error:
+                    print_error(error.__str__())
                 if self.UseModulesObject.Status==0:
                     print_success("Modules Run successfully")
                 else:
@@ -848,7 +924,7 @@ class Framework(Cmd):
             else:
                 print_msg("Please use the module first")
         except Exception as error:
-            print(error)
+            write(error)
 
     def complete_exploit(self, text, line, begidx, endidx):
         #args = text.split()

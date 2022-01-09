@@ -1,7 +1,14 @@
 from SpiritCore.Modules import *
 from SpiritCore.Lib.IPy import IP
 import socket,threading,socks
-
+from SpiritCore.Lib.Lib import *
+Description="""Port Scanner
+Target Example:
+    127.0.0.1
+    127.0.0.0/24
+Proxy 
+ 
+"""
 class Module(Modules):
     Info = {
         "Name": "Port Scanner ",
@@ -9,7 +16,7 @@ class Module(Modules):
         "Description": "Port Scanner Support Proxy Scan ",
         "Options": (
             ("Target", "192.168.0.0/24", True, 'Target IP Address', None),
-            ("Proxy", "NO", True, 'Proxy Options', ["NO","HTTP","HTTPS","SOCK5","SOCK4","SpiritProxy"]),
+            ("Proxy", "NO", True, 'Proxy Options',ProxyType),
             ("Port", "80,443", True, 'Scan Port ', None),
         ),
         "Proxy":(
@@ -24,6 +31,7 @@ class Module(Modules):
      }
 
     def get_ip_status(self,ip, port):
+        
         if self.Parameate["Proxy"]=="NO":
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server.settimeout(3)
@@ -35,7 +43,7 @@ class Module(Modules):
                 print_success('{0} port {1} is open'.format(ip, port))
             else:
                 pass
-                #print(1)
+                #write(1)
         except Exception as err:
             pass
         finally:
@@ -57,6 +65,7 @@ class Module(Modules):
         threads=[]
         print_msg("Scanner Exploit %s" % self.Parameate["Target"])
         print_msg("Start Scanner")
+        
         write("="*40)
         write("")
         Host = self.Parameate["Target"]
@@ -77,6 +86,8 @@ class Module(Modules):
                 Port.append(int(P))
         else:
                 Port.append(int(self.Parameate["Port"]))
+        #WriteLogs("Scan Port:%s"%" ".join(Port))
+        WriteLogs("---------------------------------------------Tcp Scan Port-------------------------------------------")
         for Ip in ScanHost:
             for port in Port:
                 Count+=1
@@ -89,6 +100,7 @@ class Module(Modules):
             a.join()
         write("")
         write("="*40)
+        WriteLogs("-----------------------------------------------------------------------------------------------------")
 
 
 

