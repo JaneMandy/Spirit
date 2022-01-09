@@ -1,4 +1,4 @@
-#
+
 #Spirit-Framework ZSD v1.0.5-rc2
 
 ###Version:1.0.5-rc2   By:ZSD 3he11
@@ -28,14 +28,23 @@
 ###命令解释
 
 back           返回命令
+
 exploit       运行模块Exploit函数
+
 generate    生成后门文件
+
 help           帮助信息 （没有写全 只要banner）
+
 info            模块信息
+
 session      后门会话信息
+
 set             修改参数
+
 show         查看参数
+
 use            使用模块
+
 ***
 ###用法与配置
 
