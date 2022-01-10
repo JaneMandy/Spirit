@@ -36,7 +36,11 @@ def hex2bytes(s):
     return rbytes
 
 class CMAKE:
+<<<<<<< HEAD
     STDOUT=False
+=======
+    
+>>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
     Types="exe"
     Filename="shellcode"
     Sources="main.cpp"  #
@@ -83,11 +87,17 @@ class CMAKE:
                 Command.append("x64")
             Command.append(".")
             WriteLogs("Run CMake:%s"%" ".join(Command))
+<<<<<<< HEAD
             if self.STDOUT:
                 object = subprocess.Popen(Command,stdout = subprocess.PIPE,stderr = subprocess.STDOUT,cwd=self.CmakeFilePath)
             else:
                 object = subprocess.Popen(Command,cwd=self.CmakeFilePath)
             object.wait()
+=======
+            object = subprocess.Popen(Command,cwd=self.CmakeFilePath)
+            object.wait()
+            WriteLogs("Run Command"+object.__str__())
+>>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
             if True:  #Windows Linux support 
                 Command=[]
                 Command.append("cmake")
@@ -96,6 +106,7 @@ class CMAKE:
                 Command.append("--config")
                 Command.append("Release")
             WriteLogs("Build Command CMake:%s"%" ".join(Command))
+<<<<<<< HEAD
             if self.STDOUT:
                 print_success("Build DLL........")
                 object2 = subprocess.Popen(Command,stdout = subprocess.PIPE,stderr = subprocess.STDOUT,cwd=self.CmakeFilePath)
@@ -103,6 +114,10 @@ class CMAKE:
                 object2 = subprocess.Popen(Command,cwd=self.CmakeFilePath)
             object2.wait()
             #print(self.GenerateFile)
+=======
+            object2 = subprocess.Popen(Command,cwd=self.CmakeFilePath)
+            object2.wait()
+>>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
             if os.path.exists(self.GenerateFile):
                 WriteLogs("=======================================================================================")
                 WriteLogs("=======================================================================================")
@@ -126,6 +141,7 @@ class CMAKE:
 
 
 
+<<<<<<< HEAD
 class NASM:
     Types="exe"
     NasmFilePath=""
@@ -172,6 +188,9 @@ class NASM:
         except Exception as error:
             print(error)
             return ""
+=======
+
+>>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
 
 
 

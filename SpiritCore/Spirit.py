@@ -19,6 +19,7 @@ limitations under the License.
 '''
 
 
+from posixpath import expanduser
 from SpiritCore.FCmd import *
 from SpiritCore.Session import *
 from SpiritCore.System import *
@@ -208,10 +209,17 @@ class Framework(Cmd):
         if line=="":
             write("gen -t <Type> -o <output file>")
         try:
+<<<<<<< HEAD
             opts, args = getopt.getopt(line.split(" "), "hst:o:", ["type=", "output="])
             #print(args)
         except:
             write("gen -t <Type> -o <output file>  -s")
+=======
+            opts, args = getopt.getopt(line.split(" "), "ht:o:", ["type=", "output="])
+            #print(args)
+        except:
+            write("gen -t <Type> -o <output file>")
+>>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
             return
         for opt, arg in opts:
             try:

@@ -307,7 +307,10 @@ class Session(threading.Thread):
     TargetType=00
     SpiriterSession={}
     ListThread=None
+<<<<<<< HEAD
     Parameate={}
+=======
+>>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
     Path = ""
     def __init__(self,Object):
         threading.Thread.__init__(self)
@@ -343,8 +346,12 @@ class Session(threading.Thread):
             try:
                 self.Object.SObject=self.SObject
                 self.Object.SessionObject=self
+<<<<<<< HEAD
                 if UUID=="":
                     self.Object.Listen(self)
+=======
+                self.Object.Listen(self)
+>>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
             except Exception as error:
                 print_error(error.__str__())
             if UUID!="":

@@ -176,6 +176,7 @@ def input_chions(default,name,Parame,Des):
         return line
     else:
         return default
+<<<<<<< HEAD
 
 def bool_chions(default,name):
     write("")
@@ -196,6 +197,8 @@ def bool_chions(default,name):
         elif default.lower() == "no" or  default.lower() == "false"  or default.lower() == "n" or default.lower() == "f":
             return False
 
+=======
+>>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
 def WriteLogs(line,end="\n"):
     try:
         LogData=b""
