@@ -29,6 +29,49 @@ v1.0.5-rc2
 
 目前版本：支持 后门/shellcode 生成，端口扫描，爬虫信息收集(rad)，Web漏洞扫描（基于xray），FOFA搜索。
 
+注意Spiriter 生成 和 运行 监听时，必须将PemoteHost和Port参数指向攻击机对应。
+例如:
+  
+  例子1
+  
+  攻击机IP：192.168.0.100
+   
+   那么我们将RemoteHost设为192.168.0.100 
+   
+   LocalPort为本地监听端口为4444，那么Port设为4444
+   
+   LocalHost默认即可。
+  
+  
+ 例子2
+ 
+  端口转发，我们使用一台服务器作为转发（VPS）
+  
+   攻击机：192，168.0.100
+   
+   框架监听端口：8080
+   
+   VPS IP:122.31.122.122 (这里随便起一个ip)
+   
+   VPS端口：3306
+   
+   那么
+   
+   RemoteHost设置为：122.31.122.122
+   
+   Port设置为:3306  
+   
+   LocalHost默认即可
+   
+   LocalPort设置为：8080
+   
+  	
+           被攻击机   ->  vps：122.31.122.122：3306 -> 攻击者
+   
+   
+
+
+	
 
 漏洞利用目前只支持CVE-2020-0796 MS17-010
 
@@ -66,6 +109,7 @@ SpiritCore目录下Config为配置文件，里面存放FOFA等配置，但是xra
 支持环境：Windows Linux
 
 （建议使用Linux，因为Windows测试并不完善）
+
 运行环境：建议使用Python3（可以使用Python2，但不建议）
 
 安装依赖：impacket 、mingw-w64、 cmake、nasm
