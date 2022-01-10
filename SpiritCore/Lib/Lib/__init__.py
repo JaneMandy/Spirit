@@ -16,7 +16,6 @@ def GetBinPath():
     return Path
 
 
-<<<<<<< HEAD
 
 
 
@@ -27,5 +26,3 @@ def GetBinPath():
 
 
 
-=======
->>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560

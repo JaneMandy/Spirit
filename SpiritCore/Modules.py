@@ -42,7 +42,6 @@ class Modules:
             
         except Exception as error:
             pass
-<<<<<<< HEAD
         try:
             spacer=""
             if self.configuration:
@@ -74,8 +73,6 @@ class Modules:
                 write('\n%sNo options available for this module\n' % (spacer))
         except Exception as error:
             print_error(error.__str__())
-=======
->>>>>>> 9dbce14cb0e4785b049f67e3bb46f02c4c305560
         #write(self.Parameate)
         #write(self.Parameate)
     def Init(self,Object):
