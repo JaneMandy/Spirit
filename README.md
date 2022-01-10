@@ -1,7 +1,7 @@
 
-#Spirit-Framework ZSD v1.0.5-rc2
+#Spirit-Framework ZSD v1.0.6
 
-###Version:1.0.5-rc2   By:ZSD 3he11
+###Version:1.0.6   By:ZSD 3he11
 
 ***
 更新信息：
