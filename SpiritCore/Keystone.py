@@ -1,5 +1,5 @@
 from binascii import b2a_hex
-from keystone import *
+
 from binascii import hexlify, unhexlify
 
 X86_16  = 'i186'
@@ -17,6 +17,18 @@ SPARC32 = 'sparc32'
 SPARC64 = 'sparc64'
 SYSTEMZ = 'systemz'
 #x86 x64
+
+
+
+
+
+
+
+
+
+
+
+
 def shellcodecpphex(xor):
     shellcode = ''
     try:

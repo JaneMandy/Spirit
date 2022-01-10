@@ -1,6 +1,7 @@
 from SpiritCore.System import *
 
 
+
 class ShellCode:
     Architecture="x64"
     def __init__(self,Object,PayloadName,Parameate):
@@ -50,10 +51,21 @@ class Payload:
     Name=""
     Object=None
     Values={}
+    Types="Spiriter"
     required={}
     description={}
     Parameate = {}
-
+    def Verfily(self,Parame,File,Type):
+        self.Parame=Parame
+        self.File=File
+        self.Type=Type
+        if Type in self.supportfile:
+            print_success("Payload Support Generate")
+            return True
+        else:
+            print_error("Generate File Type Not support")
+            print_warning("The Payload SUPPORT Type:%s"%" ".join(self.supportfile))
+            False
     def SetUUidSession(self,UUID):
         try:
             Ret = self.SessionInfo()
@@ -69,6 +81,7 @@ class Payload:
             for key in sorted(self.Object.PayloadParameate):
                 self.Parameate.update({key:self.Object.PayloadParameate[key]})
                 self.Object.UsePayloadObject.Parameate.update({key:self.Object.PayloadParameate[key]})
+        
 
     def GetParameate(self, Name):
         return self.Values

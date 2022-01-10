@@ -19,7 +19,6 @@ limitations under the License.
 '''
 
 
-from posixpath import expanduser
 from SpiritCore.FCmd import *
 from SpiritCore.Session import *
 from SpiritCore.System import *
@@ -201,7 +200,6 @@ class Framework(Cmd):
         except Exception as error:
             ErrorInfos = "Error:%s" % (error.__str__())
             print_error(ErrorInfos)
-            exit()
         else:
             pass
     def do_generate(self,line):
@@ -210,15 +208,27 @@ class Framework(Cmd):
         if line=="":
             write("gen -t <Type> -o <output file>")
         try:
-            opts, args = getopt.getopt(line.split(" "), "ht:o:", ["type=", "output="])
+            opts, args = getopt.getopt(line.split(" "), "hst:o:", ["type=", "output="])
             #print(args)
         except:
-            write("gen -t <Type> -o <output file>")
+            write("gen -t <Type> -o <output file>  -s")
             return
         for opt, arg in opts:
+            try:
+                    self.UseModulesObject.Exst=1
+            except:
+                pass
             if opt == '-h':
                 print_msg("gen -t <Local File> -o <Upload Path>")
                 return
+            
+            elif opt == '-s':
+                print_msg("ADD -S Parameate")
+                try:
+                    self.UseModulesObject.Exst=0
+                except:
+                    pass
+                
             elif opt in ("-o", "-output"):
                 output = arg
             elif opt in ("-t","-type"):
@@ -264,22 +274,22 @@ class Framework(Cmd):
                         self.modules[moduleName].Init(self)
                         self.modules[moduleName].LoadStatus=True
                         self.modules[moduleName].Name=moduleName
+                        self.modules[moduleName].PayloadName=moduleName
                         self.ParameateTmpInfo = self.modules[moduleName].Info.get("Options")
                         if self.ParameateTmpInfo:
                             for option in self.ParameateTmpInfo:
                                 self.r_option(*option)
                     #self.modules[moduleName].Execute()
                     except Exception as Error:
-                        WriteLogs(ErrorInfo)
                         ErrorInfo="Load %s ---- %s"%(moduleName,Error.__str__())
-                        
+                        WriteLogs(ErrorInfo)
                         print_error(ErrorInfo)
                     else:
                         self.ModulesCount+=1
                         self.ModulesList.append(moduleName)
         except Exception as error:
-            ErrorInfo = "Error:%s" % (error.__str__())
-            print_error(ErrorInfo)
+            ErrorInfos = "Error:%s" % (error.__str__())
+            print_error(ErrorInfos)
             exit()
         else:
             print_success("Moules Loaded Count:%d"%self.ModulesCount)
@@ -537,7 +547,10 @@ class Framework(Cmd):
                 except Exception as error:
                     pass
 
-
+    def do_exit(self,line):
+        print_msg("Exit Spirit")
+        exit()
+    
     def do_set(self,line):
         options = line.split()
         if len(options) < 2:
@@ -645,8 +658,28 @@ class Framework(Cmd):
             #write(error)
             pass
 
-
-
+    def do_search(self,line):
+        print_msg("Search Modules:%s"%line)
+        COunt=0
+        modlename=""
+        module_names = self.ModulesList
+        print_msg("Search Modules Name")
+        for modlename in module_names:
+            if line.lower() in modlename.lower():
+                writetext=modlename.replace(line,TextColor(line,COLOR_ATT=COLO_RED))
+                write(writetext)
+                COunt+=1
+        write("\n")
+        print_msg("Search Description")
+        for modlename in module_names:
+            ModulesObj=self.modules[modlename]
+            Description = ModulesObj.Info.get("Description")
+            if line.lower() in Description.lower():
+                writetext=Description.replace(line,TextColor(line,COLOR_ATT=COLO_RED))
+                write(modlename)
+                write("\t%s"%writetext)
+                COunt+=1
+        print_success("Search Successfully Count:%d"%COunt)
     def complete_use(self, text, line, begidx, endidx):
 
         module_names = self.ModulesList
@@ -828,6 +861,7 @@ class Framework(Cmd):
             print_msg("-----------Show Modules ---------------------------")
             for name in self.ModulesList:
                 write(" "+name+"\n")
+            return
         self.show_options()
 
     def complete_show(self, text, line, begidx, endidx):

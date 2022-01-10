@@ -1,3 +1,4 @@
+from readline import redisplay
 import  sys
 import  datetime
 from SpiritCore.Lib.gol import *
@@ -175,6 +176,26 @@ def input_chions(default,name,Parame,Des):
         return line
     else:
         return default
+
+def bool_chions(default,name):
+    write("")
+    prompt="%s %s [%s] : "%(TextColor("[?]",COLO_BLUE),name,str(default))
+    write("")
+    if sys.version_info.major == 2:
+        line = raw_input(prompt)
+        # write(line)
+    else:
+        line = str(input(prompt))
+    if line.lower() == "yes" or line.lower() == "true" or line.lower() == "y" or line.lower() == "t":
+        return True
+    elif line.lower() == "no" or  line.lower() == "false" or  line.lower() == "n" or  line.lower() == "f":
+        return False
+    else:
+        if default.lower() == "yes" or default.lower() == "true".lower() or default.lower() == "y" or default.lower() == "t":
+            return True
+        elif default.lower() == "no" or  default.lower() == "false"  or default.lower() == "n" or default.lower() == "f":
+            return False
+
 def WriteLogs(line,end="\n"):
     try:
         LogData=b""

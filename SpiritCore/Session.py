@@ -272,8 +272,19 @@ class SessionConsole(Cmd):
 
 
 
-
-
+def SessionStart(self):
+    SessionObj = Session(self.Object)
+    SessionObj.TargetOS =self.Object.UsePayloadObject.OS
+    SessionObj.PayloadType=self.Object.UsePayloadObject.Types
+    SessionObj.SObject=self.Object
+    WriteLogs("Call Payload the Handler %s"%self.Object.UsePayloadObject.Name)
+    SessionObj.start()
+    try:
+        SessionObj.Console("")
+    except Exception as error:
+        write("Error Handler:Exploit:30")
+        print_error(error.__str__())
+        return
 
 
 
@@ -296,6 +307,7 @@ class Session(threading.Thread):
     TargetType=00
     SpiriterSession={}
     ListThread=None
+    Parameate={}
     Path = ""
     def __init__(self,Object):
         threading.Thread.__init__(self)
@@ -331,7 +343,8 @@ class Session(threading.Thread):
             try:
                 self.Object.SObject=self.SObject
                 self.Object.SessionObject=self
-                self.Object.Listen(self)
+                if UUID=="":
+                    self.Object.Listen(self)
             except Exception as error:
                 print_error(error.__str__())
             if UUID!="":

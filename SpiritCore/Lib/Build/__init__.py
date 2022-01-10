@@ -36,7 +36,7 @@ def hex2bytes(s):
     return rbytes
 
 class CMAKE:
-    
+    STDOUT=False
     Types="exe"
     Filename="shellcode"
     Sources="main.cpp"  #
@@ -83,9 +83,11 @@ class CMAKE:
                 Command.append("x64")
             Command.append(".")
             WriteLogs("Run CMake:%s"%" ".join(Command))
-            object = subprocess.Popen(Command,cwd=self.CmakeFilePath)
+            if self.STDOUT:
+                object = subprocess.Popen(Command,stdout = subprocess.PIPE,stderr = subprocess.STDOUT,cwd=self.CmakeFilePath)
+            else:
+                object = subprocess.Popen(Command,cwd=self.CmakeFilePath)
             object.wait()
-            WriteLogs("Run Command"+object.__str__())
             if True:  #Windows Linux support 
                 Command=[]
                 Command.append("cmake")
@@ -94,8 +96,13 @@ class CMAKE:
                 Command.append("--config")
                 Command.append("Release")
             WriteLogs("Build Command CMake:%s"%" ".join(Command))
-            object2 = subprocess.Popen(Command,cwd=self.CmakeFilePath)
+            if self.STDOUT:
+                print_success("Build DLL........")
+                object2 = subprocess.Popen(Command,stdout = subprocess.PIPE,stderr = subprocess.STDOUT,cwd=self.CmakeFilePath)
+            else:
+                object2 = subprocess.Popen(Command,cwd=self.CmakeFilePath)
             object2.wait()
+            #print(self.GenerateFile)
             if os.path.exists(self.GenerateFile):
                 WriteLogs("=======================================================================================")
                 WriteLogs("=======================================================================================")
@@ -119,7 +126,52 @@ class CMAKE:
 
 
 
-
+class NASM:
+    Types="exe"
+    NasmFilePath=""
+    Filename="shellcode"
+    SourceCode=""
+    Sources="main.asm"
+    GenerateFile="shellcode.bin"
+    def Generate(self):
+        WriteLogs("Generate:NASM Build")
+        try:
+            self.NasmFilePath=MakeLogsPath(["NASM-%s"%uuid.uuid4()])
+            if(os.path.exists(self.NasmFilePath)):
+                pass
+            else:
+                os.mkdir(self.NasmFilePath)
+                WriteLogs("Create Dir:%s "%self.NasmFilePath)
+            WriteLogs("Build  %s"%(self.Filename))
+            Sources = MakePath([self.Sources],self.NasmFilePath)
+            if True:
+                self.GenerateFile=MakePath([self.Filename+".bin"],self.NasmFilePath)
+            WriteLogs("Sources:%s"%Sources)
+            WriteLogs("---------------------------Source Code----------------------------------------\n"+self.SourceCode)
+            WriteLogs("------------------------------------------------------------------------------")
+            open(Sources,"wb+").write(bytes(self.SourceCode,encoding="utf-8")) #Windows Linux support 
+            Command=[]
+            Command.append("nasm")
+            Command.append(Sources)
+            Command.append("-o")
+            Command.append(self.GenerateFile)
+            WriteLogs("Build Command CMake:%s"%" ".join(Command))
+            object2 = subprocess.Popen(Command,cwd=self.NasmFilePath)
+            object2.wait()
+            #print(self.GenerateFile)
+            if os.path.exists(self.GenerateFile):
+                WriteLogs("=======================================================================================")
+                WriteLogs("=======================================================================================")
+                WriteLogs("=======================================================================================")
+                WriteLogs("=======================================================================================")
+                WriteLogs("Build Success:%s"%self.GenerateFile)
+                return self.GenerateFile
+            else:
+                WriteLogs("Build Faild")
+                return ""
+        except Exception as error:
+            print(error)
+            return ""
 
 
 

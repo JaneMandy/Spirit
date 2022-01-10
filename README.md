@@ -1,11 +1,34 @@
-#
-#Spirit-Framework ZSD v1.0.5
-###Version:1.0.5    By:ZSD 3he11
+
+#Spirit-Framework ZSD v1.0.5-rc2
+
+###Version:1.0.5-rc2   By:ZSD 3he11
+
+***
+更新信息：
+
+v1.0.6 
+  本版本支持Spiriter ShellCode加载。
+
+  添加了CMAKE NASM构造编译环境模块。
+  
+  generate命令 添加了-S参数，主要针对Spiriter生成非shellcode的后门。
+
+v1.0.5-rc2
+
+  添加了exit命令 与退出问题。 
+  
+  添加了search命令 以描述信息与模块名为标准搜索
+  
+  修复了SpiritCore.Spirit里面的load_modules函数 异常处理问题。
+
+
 ***
 
 以MSF为参考制作的渗透框架，目前功能并不是非常完善。还有很多bug，谅大佬们多多海涵。
 
+
 目前版本：支持 后门/shellcode 生成，端口扫描，爬虫信息收集(rad)，Web漏洞扫描（基于xray），FOFA搜索。
+
 
 漏洞利用目前只支持CVE-2020-0796 MS17-010
 
@@ -15,23 +38,38 @@
 ###命令解释
 
 back           返回命令
+
 exploit       运行模块Exploit函数
+
 generate    生成后门文件
+
 help           帮助信息 （没有写全 只要banner）
+
 info            模块信息
+
 session      后门会话信息
+
 set             修改参数
+
 show         查看参数
+
 use            使用模块
+
 ***
 ###用法与配置
+
 用法与MSF基本一样。
+
 SpiritCore目录下Config为配置文件，里面存放FOFA等配置，但是xray已经做到自动定位，不用填写。
+
 ###安装与运行
 支持环境：Windows Linux
+
 （建议使用Linux，因为Windows测试并不完善）
 运行环境：建议使用Python3（可以使用Python2，但不建议）
+
 安装依赖：impacket 、mingw-w64、 cmake、nasm
+
 ***
 ##模块开发
 ~~~
