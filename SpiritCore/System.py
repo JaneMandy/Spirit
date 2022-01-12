@@ -1,4 +1,3 @@
-from readline import redisplay
 import  sys
 import  datetime
 from SpiritCore.Lib.gol import *

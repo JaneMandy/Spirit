@@ -97,7 +97,7 @@ class CMAKE:
                 Command.append("Release")
             WriteLogs("Build Command CMake:%s"%" ".join(Command))
             if self.STDOUT:
-                print_success("Build DLL........")
+                #object2 = subprocess.Popen(Command,cwd=self.CmakeFilePath)
                 object2 = subprocess.Popen(Command,stdout = subprocess.PIPE,stderr = subprocess.STDOUT,cwd=self.CmakeFilePath)
             else:
                 object2 = subprocess.Popen(Command,cwd=self.CmakeFilePath)
@@ -150,8 +150,12 @@ class NASM:
             WriteLogs("---------------------------Source Code----------------------------------------\n"+self.SourceCode)
             WriteLogs("------------------------------------------------------------------------------")
             open(Sources,"wb+").write(bytes(self.SourceCode,encoding="utf-8")) #Windows Linux support 
+            if Win32Platform:
+                NasmPath=MakePath(["NASM","nasm.exe"],GetBinPath())
+            else:
+                NasmPath="nasm"
             Command=[]
-            Command.append("nasm")
+            Command.append(NasmPath)
             Command.append(Sources)
             Command.append("-o")
             Command.append(self.GenerateFile)

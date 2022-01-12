@@ -68,7 +68,7 @@ typedef NTSTATUS(NTAPI* pNtQueueApcThread)(HANDLE ThreadHandle, PIO_APC_ROUTINE 
 %s //ShellCode
 
 
-int run()
+void run()
 {
 
     %s //Decode ShellCode

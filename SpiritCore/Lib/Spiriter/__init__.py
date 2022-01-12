@@ -44,8 +44,18 @@ class Spiriter(Cmd):
         self.Send(0x0,b"\x61"*1024)
         try:
             Ret = self.Recv()
-            write(str(Ret.Data,encoding="utf-8",errors="ignore"))
-            print_success("Loaded Session Manage")
+            try:
+                self.Send(SPIRITER_EXEC_CMD,b"powershell -c \"%s\"\x00"%bytes("Get-WmiObject Win32_OperatingSystem | Format-List BootDevice, BuildNumber, BuildType, Caption, CodeSet, CountryCode, CreationClassName, CSCreationClassName, CSDVersion, CSName, Description, Locale, Manufacturer, Name, Organization, OSArchitecture, OtherTypeDescription, PlusProductID, PlusVersionNumber, RegisteredUser, SerialNumber, Status, SystemDevice, SystemDirectory, SystemDrive, Version, WindowsDirectory",encoding="utf-8"))
+            except Exception as error:
+                print_error(error.__str__())
+            Ret = self.Recv()
+            try:
+                Buffer=Ret.Data.replace(b"\x00",b"")
+                Buffer=Buffer.replace(b"\xcc",b"")
+                write(str(Buffer,encoding="utf-8",errors="ignore"))
+            except Exception as error:
+                print_error(error.__str__())
+                print_success("Loaded Session Manage")
         except:
             print_error("Error Load session ")
         try:

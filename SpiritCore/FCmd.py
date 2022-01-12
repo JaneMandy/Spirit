@@ -191,6 +191,7 @@ class Cmd:
 
         """
         if self.lastcmd:
+            self.lastcmd=""
             return self.onecmd(self.lastcmd)
 
     def default(self, line):

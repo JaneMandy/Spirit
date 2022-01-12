@@ -6,7 +6,17 @@
 ***
 更新信息：
 
+v1.0.6-rc2
+  
+  修复了空命令时仍然执行上一条已执行命令
+
+  修复了Windows编译Spiriter问题，包括shellcode编译问题（内置了NASM编译器）
+
+  优化了session命令，连接会话时 输出系统基本系统。
+  
+
 v1.0.6 
+
   本版本支持Spiriter ShellCode加载。
 
   添加了CMAKE NASM构造编译环境模块。
