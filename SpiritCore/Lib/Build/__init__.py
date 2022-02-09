@@ -1,5 +1,4 @@
-from posixpath import expanduser
-from typing import Type
+
 from SpiritCore.Lib.Logs import *
 from SpiritCore.System import *
 from SpiritCore.Lib.Lib import *
@@ -43,6 +42,7 @@ class CMAKE:
     CmakeFilePath=""
     SourceCode=""  #BuildCode 
     GenerateFile="" # Build File
+    CppCmakeLists=""
     def __init__(self):
         self.CppCmakeLists=CppCmakeLists
     def Generate(self):

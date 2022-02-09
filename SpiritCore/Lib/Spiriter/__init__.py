@@ -45,6 +45,7 @@ class Spiriter(Cmd):
         try:
             Ret = self.Recv()
             try:
+                #self.Send(0x0,b"\x61"*1024)
                 self.Send(SPIRITER_EXEC_CMD,b"powershell -c \"%s\"\x00"%bytes("Get-WmiObject Win32_OperatingSystem | Format-List BootDevice, BuildNumber, BuildType, Caption, CodeSet, CountryCode, CreationClassName, CSCreationClassName, CSDVersion, CSName, Description, Locale, Manufacturer, Name, Organization, OSArchitecture, OtherTypeDescription, PlusProductID, PlusVersionNumber, RegisteredUser, SerialNumber, Status, SystemDevice, SystemDirectory, SystemDrive, Version, WindowsDirectory",encoding="utf-8"))
             except Exception as error:
                 print_error(error.__str__())
@@ -205,12 +206,12 @@ class Spiriter(Cmd):
         print_msg("Exec Command")
         write("Command:%s"%line)
         try:
-            self.Send(SPIRITER_EXEC_CMD,b"powershell -c \"%s\"\x00"%bytes(line,encoding="utf-8"))
+            self.Send(SPIRITER_EXEC_CMD,bytes("powershell -c \" "+line+" \"\x00 ",encoding="utf-8"))
         except Exception as error:
             print_error(error.__str__())
         write("===========================Output=============================")
-        Ret = self.Recv()
         try:
+            Ret = self.Recv()
             Buffer=Ret.Data.replace(b"\x00",b"")
             Buffer=Buffer.replace(b"\xcc",b"")
             write(str(Buffer,encoding="utf-8",errors="ignore"))

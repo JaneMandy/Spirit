@@ -1,3 +1,4 @@
+
 import  sys
 import  datetime
 from SpiritCore.Lib.gol import *
@@ -12,7 +13,7 @@ except:
 mswindows = (sys.platform == "win32")
 COLORIZEMAP = {"[-]" : {"fg" : "red",     "attr" : "bold"},
                "[+]" : {"fg" : "green",   "attr" : "bold"},
-               "[!]" : {"fg" : "red",     "attr" : "bold"},
+               "[!]" : {"fg" : "yellow",     "attr" : "bold"},
                "[*]" : {"fg" : "blue",   "attr" : "bold"},
                "[?]" : {"fg" : "yellow",    "attr" : "bold"}}
 COLO_RED        = {"fg" : "red",     "attr" : "bold"}
@@ -84,7 +85,7 @@ def VerPython3():
     else:
         return True
 
-def formattime(self,timestamp=None):
+def formattime(timestamp=None):
 	if timestamp is None:
 		timestamp = datetime.datetime.now()
 	timestamp = str(timestamp)
@@ -225,22 +226,27 @@ def write( line,end="\n"):
         # Permanently disable color and continue
         write(line)
 
-def print_error( line,time=1):
-    if time==0:
+def print_error( line,time=False):
+    if time==True:
         line= TimeDate()+""+line
     write("[-] " + line)
 
-def print_success( line,time=1):
-    if time==0:
+def print_success( line,time=False):
+    if time==True:
         line= TimeDate()+""+line
     write("[+] " + line)
 
-def print_warning( line,time=1):
-    if time==0:
+def print_warning( line,time=False):
+    if time==True:
         line= TimeDate()+""+line
     write("[!] " + line)
 
-def print_msg( line,time=1):
-    if time==0:
+def print_msg( line,time=False):
+    if time==True:
         line= TimeDate()+""+line
     write("[*] " + line)
+
+def print_what( line,time=False):
+    if time==True:
+        line= TimeDate()+""+line
+    write("[?] " + line)

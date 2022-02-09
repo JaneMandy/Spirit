@@ -7,6 +7,7 @@
 
 import base64
 import requests
+from SpiritCore.Config import *
 
 from SpiritCore.System import *
 class FofaAPI(object):
@@ -14,7 +15,7 @@ class FofaAPI(object):
     def __init__(self, email, key):
         self.email = email
         self.key = key
-        self.base_url = 'https://fofa.so'
+        self.base_url = Fofa_Address
         self.search_api_url = '/api/v1/search/all'
         self.login_api_url = '/api/v1/info/my'
         self.UserInfo= self.get_userinfo()

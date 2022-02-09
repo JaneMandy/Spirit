@@ -27,7 +27,6 @@ from SpiritCore.Config import *
 from multiprocessing import Event
 import fnmatch,os,imp,uuid,getopt
 
-
 #34
 
 

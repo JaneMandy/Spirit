@@ -1,3 +1,5 @@
+#https://github.com/monoxgas/sRDI
+
 import sys
 
 import struct

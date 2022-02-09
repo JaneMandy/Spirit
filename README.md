@@ -1,10 +1,10 @@
 
-#Spirit-Framework ZSD v1.0.6
+# Spirit-Framework ZSD v1.0.6
 
-###Version:1.0.6   By:ZSD 3he11
+### Version:1.0.6   By:ZSD 3he11
 
 ***
-更新信息：
+####更新信息：
 
 v1.0.6-rc2
   
@@ -45,7 +45,7 @@ v1.0.5-rc2
 ***
   生成EXE DLL格式后门需要安装cmake Mingw-W64
 ***
-###命令解释
+### 命令解释
 
 back           返回命令
 
@@ -66,13 +66,13 @@ show         查看参数
 use            使用模块
 
 ***
-###用法与配置
+### 用法与配置
 
 用法与MSF基本一样。
 
 SpiritCore目录下Config为配置文件，里面存放FOFA等配置，但是xray已经做到自动定位，不用填写。
 
-###安装与运行
+### 安装与运行
 支持环境：Windows Linux
 
 （建议使用Linux，因为Windows测试并不完善）
@@ -81,7 +81,7 @@ SpiritCore目录下Config为配置文件，里面存放FOFA等配置，但是xra
 安装依赖：impacket 、mingw-w64、 cmake、nasm
 
 ***
-##模块开发
+## 模块开发
 ~~~
 
 from SpiritCore.Modules import *
@@ -138,16 +138,16 @@ class Module(Modules):
 
 
 
-###安装:
+### 安装:
 
-#####安装组件
+##### 安装组件
 ~~~~
 sudo apt install mingw-w64
 sudo apt install cmake
 ~~~~
 
 
-#####Python模块安装
+##### Python模块安装
 ~~~~
 Python-pyreadline   (Support GetOutputFile Windows需要安装)
 Python-impacket    （如果对MS17-010进行利用，那么需要安装）
