@@ -1,10 +1,18 @@
 
-# Spirit-Framework ZSD v1.0.6
+# Spirit-Framework ZSD v1.0.6-rc3
 
 ### Version:1.0.6   By:ZSD 3he11
 
 ***
 ####更新信息：
+v1.0.6-rc3
+
+修复了FOFA不能查询问题，并且支持修改fofa域名等信息
+
+对MS17-010 Payload进行优化。解决了攻击后重启问题。
+
+声明：因为最近在改框架一些代码块，所以有些bug，大佬们发现及时指出谢谢。
+
 
 v1.0.6-rc2
   
